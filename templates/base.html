@@ -1,0 +1,97 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Mtronix{% endblock %}</title>
+    <meta name="description" content="Mtronix Inventory and Sales Management System.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <script src="{% static 'js/app.js' %}" defer></script>
+</head>
+<body>
+    <aside class="sidebar">
+        <a class="brand" href="{% url 'dashboard' %}">
+            <span class="brand-mark">M</span>
+            <span>Mtronix</span>
+        </a>
+        <nav class="nav">
+            <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <span class="nav-icon">⊞</span> Dashboard
+            </a>
+            <a href="{% url 'products:list' %}" class="{% if 'products' in request.path %}active{% endif %}">
+                <span class="nav-icon">📦</span> Products
+            </a>
+            <a href="{% url 'inventory:list' %}" class="{% if 'inventory' in request.path %}active{% endif %}">
+                <span class="nav-icon">🗄</span> Inventory
+            </a>
+            <a href="{% url 'suppliers:list' %}" class="{% if 'suppliers' in request.path %}active{% endif %}">
+                <span class="nav-icon">🏭</span> Suppliers
+            </a>
+            <a href="{% url 'purchases:list' %}" class="{% if 'purchases' in request.path %}active{% endif %}">
+                <span class="nav-icon">🛒</span> Purchases
+            </a>
+            <a href="{% url 'sales:list' %}" class="{% if 'sales' in request.path %}active{% endif %}">
+                <span class="nav-icon">💰</span> Sales
+            </a>
+            {% if request.user.is_staff %}
+            <a href="/api/" class="{% if '/api/' in request.path %}active{% endif %}">
+                <span class="nav-icon">⚡</span> API
+            </a>
+            {% endif %}
+        </nav>
+
+        <!-- User profile card at bottom of sidebar -->
+        <div class="sidebar-footer">
+            {% if request.user.is_authenticated %}
+            <div class="user-card">
+                <div class="user-avatar">{{ request.user.username|slice:":2"|upper }}</div>
+                <div class="user-info">
+                    <strong class="user-name">{{ request.user.get_full_name|default:request.user.username }}</strong>
+                    <span class="user-role">
+                        {% if request.user.profile %}
+                            {{ request.user.profile.get_role_display }}
+                        {% elif request.user.is_superuser %}
+                            Superuser
+                        {% else %}
+                            Staff
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            <a class="btn-logout" href="{% url 'accounts:logout' %}">Sign Out</a>
+            {% endif %}
+        </div>
+    </aside>
+
+    <div class="shell">
+        <header class="topbar">
+            <button class="icon-button mobile-menu" type="button" data-menu-toggle aria-label="Toggle menu">☰</button>
+            <div>
+                <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+                <p>{% block page_subtitle %}Inventory, purchases, and sales in one place.{% endblock %}</p>
+            </div>
+            {% block header_action %}{% endblock %}
+        </header>
+
+        <!-- Flash messages -->
+        {% if messages %}
+        <div class="messages-container">
+            {% for message in messages %}
+            <div class="flash-message flash-{{ message.tags }}">
+                {{ message }}
+                <button class="flash-close" type="button" aria-label="Dismiss">✕</button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

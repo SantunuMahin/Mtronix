@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Products - Mtronix{% endblock %}
+{% block page_title %}Products{% endblock %}
+{% block page_subtitle %}Manage catalog items, pricing, SKUs, and stock thresholds.{% endblock %}
+{% block header_action %}<a class="button primary" href="{% url 'products:create' %}">New Product</a>{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="table-wrap">
+        <table data-filter-table>
+            <thead>
+                <tr><th>Name</th><th>SKU</th><th>Purchase</th><th>Selling</th><th>Stock</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.sku }}</td>
+                    <td>{{ product.purchase_price }}</td>
+                    <td>{{ product.selling_price }}</td>
+                    <td>{{ product.inventory.quantity|default:0 }}</td>
+                    <td><a class="button" href="{% url 'products:update' product.pk %}">Edit</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">No products yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

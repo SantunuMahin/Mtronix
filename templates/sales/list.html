@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Sales - Mtronix{% endblock %}
+{% block page_title %}Sales{% endblock %}
+{% block page_subtitle %}Record outgoing stock and customer sales.{% endblock %}
+{% block header_action %}<a class="button primary" href="{% url 'sales:create' %}">New Sale</a>{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+        <!-- Search Form -->
+        <form method="get" style="display: flex; gap: 8px; flex: 1; min-width: 280px;">
+            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search by customer name..." style="flex: 1; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit;">
+            <button class="button primary" type="submit">Search</button>
+            {% if query %}
+            <a class="button" href="{% url 'sales:list' %}">Clear</a>
+            {% endif %}
+        </form>
+        
+        <!-- PDF Reports -->
+        <div class="actions" style="display: flex; gap: 8px; align-items: center;">
+            <span style="color: var(--muted); font-size: 14px; font-weight: bold;">Print Sales Report:</span>
+            <a class="button" href="{% url 'sales:report_pdf' %}?period=today" target="_blank">Today</a>
+            <a class="button" href="{% url 'sales:report_pdf' %}?period=month" target="_blank">This Month</a>
+            <a class="button" href="{% url 'sales:report_pdf' %}?period=year" target="_blank">This Year</a>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Sale ID</th>
+                    <th>Customer</th>
+                    <th>Date</th>
+                    <th>Products Sold</th>
+                    <th>Total Amount</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales %}
+                <tr>
+                    <td><strong>SALE-{{ sale.pk|stringformat:"05d" }}</strong></td>
+                    <td>{{ sale.customer_name|default:'Walk-in' }}</td>
+                    <td>{{ sale.sold_at|date:'M d, Y H:i' }}</td>
+                    <td>
+                        <span style="font-size: 13px; color: var(--muted);">
+                            {% for item in sale.items.all %}
+                                {{ item.product.name }} (x{{ item.quantity }}){% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </span>
+                    </td>
+                    <td><strong>${{ sale.total_amount }}</strong></td>
+                    <td><a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank">Print Receipt</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">No sales yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

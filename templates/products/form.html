@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - Mtronix{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_subtitle %}Keep product names, SKUs, prices, and low-stock limits accurate.{% endblock %}
+
+{% block content %}
+<section class="panel form-panel">
+    <form method="post" novalidate>
+        {% include 'includes/form.html' %}
+        <div class="form-actions">
+            <a class="button" href="{% url 'products:list' %}">Cancel</a>
+            <button class="button primary" type="submit">Save Product</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

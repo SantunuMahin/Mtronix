@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - Mtronix{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_subtitle %}Adding a sale automatically deducts stock and blocks overselling.{% endblock %}
+
+{% block content %}
+<section class="panel" style="max-width: 900px; margin: 0 auto;">
+    <form method="post" novalidate id="sale-form">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div class="alert" style="margin-bottom: 16px;">{{ form.non_field_errors }}</div>
+        {% endif %}
+        {% if formset.non_form_errors %}
+            <div class="alert" style="margin-bottom: 16px;">{{ formset.non_form_errors }}</div>
+        {% endif %}
+
+        <div class="field">
+            <span>Customer Name</span>
+            {{ form.customer_name }}
+            {% for error in form.customer_name.errors %}
+                <strong style="color: #991b1b; display: block; margin-top: 4px;">{{ error }}</strong>
+            {% endfor %}
+        </div>
+
+        {{ formset.management_form }}
+
+        <h3 style="margin-top: 28px; margin-bottom: 12px; font-size: 16px; border-bottom: 1px solid var(--line); padding-bottom: 8px;">Sale Items</h3>
+        
+        <div class="table-wrap" style="margin-bottom: 20px;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="padding: 8px;">Product</th>
+                        <th style="width: 120px; padding: 8px;">Quantity</th>
+                        <th style="width: 150px; padding: 8px;">Unit Price ($)</th>
+                        <th style="width: 150px; padding: 8px;">Total ($)</th>
+                        <th style="width: 60px; padding: 8px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="formset-container">
+                    {% for item_form in formset %}
+                    <tr class="formset-row" id="row-{{ forloop.counter0 }}">
+                        <td style="padding: 8px; vertical-align: top;">
+                            {{ item_form.product }}
+                            {% for error in item_form.product.errors %}
+                                <strong style="color: #991b1b; display: block; font-size: 11px; margin-top: 4px;">{{ error }}</strong>
+                            {% endfor %}
+                        </td>
+                        <td style="padding: 8px; vertical-align: top;">
+                            {{ item_form.quantity }}
+                            {% for error in item_form.quantity.errors %}
+                                <strong style="color: #991b1b; display: block; font-size: 11px; margin-top: 4px;">{{ error }}</strong>
+                            {% endfor %}
+                        </td>
+                        <td style="padding: 8px; vertical-align: top;">
+                            {{ item_form.unit_price }}
+                            {% for error in item_form.unit_price.errors %}
+                                <strong style="color: #991b1b; display: block; font-size: 11px; margin-top: 4px;">{{ error }}</strong>
+                            {% endfor %}
+                        </td>
+                        <td style="padding: 8px; vertical-align: middle;">
+                            <span class="row-total" style="font-weight: bold; font-size: 15px;">0.00</span>
+                        </td>
+                        <td style="padding: 8px; text-align: right; vertical-align: middle;">
+                            <button type="button" class="button remove-row-btn" style="color: #991b1b; border-color: #fca5a5; background: #fee2e2; padding: 0 10px; min-height: 30px;">✕</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 15px;">
+            <button type="button" class="button" id="add-item-btn" style="border-color: var(--accent); color: var(--accent); font-weight: bold;">+ Add Product</button>
+            <div style="font-size: 18px; font-weight: bold;">
+                Grand Total: <span id="grand-total" style="color: var(--accent); font-size: 22px;">$0.00</span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a class="button" href="{% url 'sales:list' %}">Cancel</a>
+            <button class="button primary" type="submit">Save Sale</button>
+        </div>
+    </form>
+</section>
+
+<!-- Empty Form Template for JavaScript -->
+<template id="empty-form-template">
+    <tr class="formset-row" id="row-__prefix__">
+        <td style="padding: 8px; vertical-align: top;">
+            {{ formset.empty_form.product }}
+        </td>
+        <td style="padding: 8px; vertical-align: top;">
+            {{ formset.empty_form.quantity }}
+        </td>
+        <td style="padding: 8px; vertical-align: top;">
+            {{ formset.empty_form.unit_price }}
+        </td>
+        <td style="padding: 8px; vertical-align: middle;">
+            <span class="row-total" style="font-weight: bold; font-size: 15px;">0.00</span>
+        </td>
+        <td style="padding: 8px; text-align: right; vertical-align: middle;">
+            <button type="button" class="button remove-row-btn" style="color: #991b1b; border-color: #fca5a5; background: #fee2e2; padding: 0 10px; min-height: 30px;">✕</button>
+        </td>
+    </tr>
+</template>
+
+<script>
+    // Inject the product price map from Django
+    const productsPriceMap = {{ products_json|safe }};
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const formsetContainer = document.getElementById('formset-container');
+        const addItemBtn = document.getElementById('add-item-btn');
+        const emptyTemplate = document.getElementById('empty-form-template');
+        const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
+
+        // Function to recalculate row subtotal and grand total
+        function calculateTotals() {
+            let grandTotal = 0;
+            const rows = formsetContainer.querySelectorAll('.formset-row');
+            
+            rows.forEach(row => {
+                const qtyInput = row.querySelector('input[name$="-quantity"]');
+                const priceInput = row.querySelector('input[name$="-unit_price"]');
+                const totalSpan = row.querySelector('.row-total');
+                
+                const qty = parseFloat(qtyInput.value) || 0;
+                const price = parseFloat(priceInput.value) || 0;
+                const subtotal = qty * price;
+                
+                totalSpan.textContent = subtotal.toFixed(2);
+                grandTotal += subtotal;
+            });
+            
+            document.getElementById('grand-total').textContent = '$' + grandTotal.toFixed(2);
+        }
+
+        // Hook listeners to a specific row
+        function setupRowListeners(row) {
+            const productSelect = row.querySelector('select[name$="-product"]');
+            const qtyInput = row.querySelector('input[name$="-quantity"]');
+            const priceInput = row.querySelector('input[name$="-unit_price"]');
+            const removeBtn = row.querySelector('.remove-row-btn');
+
+            // Autopopulate price when product is selected
+            productSelect.addEventListener('change', () => {
+                const selectedProductId = productSelect.value;
+                if (selectedProductId && productsPriceMap[selectedProductId]) {
+                    priceInput.value = productsPriceMap[selectedProductId];
+                } else {
+                    priceInput.value = '';
+                }
+                
+                // Default quantity to 1 if empty or 0
+                if (!qtyInput.value || parseFloat(qtyInput.value) <= 0) {
+                    qtyInput.value = '1';
+                }
+                
+                calculateTotals();
+            });
+
+            // Recalculate on inputs change
+            qtyInput.addEventListener('input', calculateTotals);
+            priceInput.addEventListener('input', calculateTotals);
+
+            // Remove row button
+            removeBtn.addEventListener('click', () => {
+                // If there is only one row left, don't remove it
+                if (formsetContainer.querySelectorAll('.formset-row').length <= 1) {
+                    alert('A sale must contain at least one item.');
+                    return;
+                }
+                row.remove();
+                reindexRows();
+                calculateTotals();
+            });
+        }
+
+        // Reindex rows to make sure form indices are contiguous for Django Formset parser
+        function reindexRows() {
+            const rows = formsetContainer.querySelectorAll('.formset-row');
+            rows.forEach((row, index) => {
+                row.id = `row-${index}`;
+                row.querySelectorAll('input, select').forEach(element => {
+                    const name = element.getAttribute('name');
+                    if (name) {
+                        element.setAttribute('name', name.replace(/items-\d+-/, `items-${index}-`));
+                    }
+                    const id = element.getAttribute('id');
+                    if (id) {
+                        element.setAttribute('id', id.replace(/id_items-\d+-/, `id_items-${index}-`));
+                    }
+                });
+            });
+            totalFormsInput.value = rows.length;
+        }
+
+        // Add item row handler
+        addItemBtn.addEventListener('click', () => {
+            const formCount = formsetContainer.querySelectorAll('.formset-row').length;
+            const newRowHtml = emptyTemplate.innerHTML.replace(/__prefix__/g, formCount);
+            
+            // Temporary container to parse HTML string
+            const tempDiv = document.createElement('tbody');
+            tempDiv.innerHTML = newRowHtml;
+            const newRow = tempDiv.firstElementChild;
+            
+            formsetContainer.appendChild(newRow);
+            totalFormsInput.value = formCount + 1;
+            
+            setupRowListeners(newRow);
+            calculateTotals();
+        });
+
+        // Initialize listeners on initial rows
+        const initialRows = formsetContainer.querySelectorAll('.formset-row');
+        initialRows.forEach(row => {
+            setupRowListeners(row);
+        });
+        
+        calculateTotals();
+    });
+</script>
+{% endblock %}

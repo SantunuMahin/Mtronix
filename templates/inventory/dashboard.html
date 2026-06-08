@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Mtronix{% endblock %}
+{% block page_title %}Mtronix Inventory Dashboard{% endblock %}
+{% block page_subtitle %}Products, stock levels, purchases, and sales at a glance.{% endblock %}
+
+{% block header_action %}
+<a class="button primary" href="{% url 'sales:create' %}">New Sale</a>
+{% endblock %}
+
+{% block content %}
+<section class="metrics">
+    <article class="metric-card">
+        <span>Total Products</span>
+        <strong>{{ total_products }}</strong>
+    </article>
+    <article class="metric-card">
+        <span>Inventory Items</span>
+        <strong>{{ current_inventory|length }}</strong>
+    </article>
+    <article class="metric-card warning">
+        <span>Low Stock Alerts</span>
+        <strong>{{ low_stock|length }}</strong>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Current Inventory</h2>
+        <a class="button" href="{% url 'inventory:list' %}">View All</a>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Product</th><th>SKU</th><th>Quantity</th><th>Low Stock At</th></tr>
+            </thead>
+            <tbody>
+                {% for item in current_inventory %}
+                <tr>
+                    <td>{{ item.product.name }}</td>
+                    <td>{{ item.product.sku }}</td>
+                    <td><span class="badge">{{ item.quantity }}</span></td>
+                    <td>{{ item.product.low_stock_threshold }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No inventory yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="three-column">
+    <article class="panel">
+        <h2>Low Stock</h2>
+        <ul class="simple-list">
+            {% for item in low_stock %}
+            <li><span>{{ item.product.name }}</span><strong>{{ item.quantity }}</strong></li>
+            {% empty %}
+            <li>No low stock items.</li>
+            {% endfor %}
+        </ul>
+    </article>
+    <article class="panel">
+        <h2>Recent Sales</h2>
+        <ul class="simple-list">
+            {% for sale in recent_sales %}
+            <li><span>{{ sale.product.name }}</span><strong>{{ sale.quantity }}</strong></li>
+            {% empty %}
+            <li>No sales yet.</li>
+            {% endfor %}
+        </ul>
+    </article>
+    <article class="panel">
+        <h2>Recent Purchases</h2>
+        <ul class="simple-list">
+            {% for purchase in recent_purchases %}
+            <li><span>{{ purchase.product.name }}</span><strong>{{ purchase.quantity }}</strong></li>
+            {% empty %}
+            <li>No purchases yet.</li>
+            {% endfor %}
+        </ul>
+    </article>
+</section>
+{% endblock %}

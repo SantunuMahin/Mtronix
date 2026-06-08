@@ -1,0 +1,12 @@
+{% csrf_token %}
+{% if form.non_field_errors %}
+    <div class="alert">{{ form.non_field_errors }}</div>
+{% endif %}
+{% for field in form %}
+    <label class="field">
+        <span>{{ field.label }}</span>
+        {{ field }}
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<strong>{{ error }}</strong>{% endfor %}
+    </label>
+{% endfor %}
