@@ -21,7 +21,4 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
 
     def get_current_stock(self, product):
-        try:
-            return product.inventory.quantity
-        except Product.inventory.RelatedObjectDoesNotExist:
-            return 0
+        return product.total_stock

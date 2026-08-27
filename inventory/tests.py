@@ -39,6 +39,51 @@ class InventoryServiceTests(TestCase):
         with self.assertRaises(ValueError):
             InventoryService.remove_stock(self.product, 1)
 
+    def test_create_purchase_records_purchase_and_adds_stock(self):
+        supplier = Supplier.objects.create(name='Local Supplier', phone='123456789')
+
+        purchase = InventoryService.create_purchase(
+            supplier=supplier,
+            product=self.product,
+            quantity=3,
+            unit_price='2.50',
+        )
+
+        self.assertEqual(Purchase.objects.get(pk=purchase.pk).quantity, 3)
+        self.assertEqual(Inventory.objects.get(product=self.product).quantity, 3)
+
+    def test_create_sale_records_items_and_removes_stock(self):
+        InventoryService.add_stock(self.product, 5)
+
+        sale = InventoryService.create_sale(
+            customer_name='Walk-in',
+            items=[
+                {
+                    'product': self.product,
+                    'quantity': 2,
+                    'unit_price': '5.00',
+                }
+            ],
+        )
+
+        self.assertEqual(SaleItem.objects.get(sale=sale).quantity, 2)
+        self.assertEqual(Inventory.objects.get(product=self.product).quantity, 3)
+
+    def test_create_sale_rolls_back_when_stock_is_short(self):
+        with self.assertRaises(ValueError):
+            InventoryService.create_sale(
+                items=[
+                    {
+                        'product': self.product,
+                        'quantity': 2,
+                        'unit_price': '5.00',
+                    }
+                ],
+            )
+
+        self.assertEqual(Sale.objects.count(), 0)
+        self.assertEqual(SaleItem.objects.count(), 0)
+
 
 class InventoryPageTests(TestCase):
     def setUp(self):
@@ -49,7 +94,7 @@ class InventoryPageTests(TestCase):
         response = self.client.get('/')
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Mtronix Inventory Dashboard')
+        self.assertContains(response, 'Dashboard')
 
     def test_inventory_list_renders(self):
         response = self.client.get('/inventory/')

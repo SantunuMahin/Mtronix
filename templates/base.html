@@ -37,11 +37,6 @@
             <a href="{% url 'sales:list' %}" class="{% if 'sales' in request.path %}active{% endif %}">
                 <span class="nav-icon">💰</span> Sales
             </a>
-            {% if request.user.is_staff %}
-            <a href="/api/" class="{% if '/api/' in request.path %}active{% endif %}">
-                <span class="nav-icon">⚡</span> API
-            </a>
-            {% endif %}
         </nav>
 
         <!-- User profile card at bottom of sidebar -->
@@ -50,8 +45,8 @@
             <div class="user-card">
                 <div class="user-avatar">{{ request.user.username|slice:":2"|upper }}</div>
                 <div class="user-info">
-                    <strong class="user-name">{{ request.user.get_full_name|default:request.user.username }}</strong>
-                    <span class="user-role">
+                   <strong class="user-name">{{ request.user.get_full_name|default:request.user.username }}</strong>
+                    <span class="user-role" style="color: {% if request.user.profile.get_role_display == 'Admin' %}red{% elif request.user.is_superuser %}orange{% else %}inherit{% endif %};">
                         {% if request.user.profile %}
                             {{ request.user.profile.get_role_display }}
                         {% elif request.user.is_superuser %}
@@ -60,6 +55,7 @@
                             Staff
                         {% endif %}
                     </span>
+                                    
                 </div>
             </div>
             <a class="btn-logout" href="{% url 'accounts:logout' %}">Sign Out</a>

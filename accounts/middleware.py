@@ -5,13 +5,11 @@ from django.urls import reverse
 class LoginRequiredMiddleware:
     """
     Redirects unauthenticated users to the login page for all HTML views.
-    Excludes: login/logout pages, REST API (JWT-protected), Django Admin,
-    and static files.
+    Excludes: login/logout pages, Django Admin, and static files.
     """
     EXEMPT_PREFIXES = (
         '/accounts/login/',
         '/accounts/logout/',
-        '/api/',
         '/admin/',
         '/static/',
     )

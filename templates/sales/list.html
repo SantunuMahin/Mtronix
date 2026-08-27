@@ -6,6 +6,15 @@
 {% block header_action %}<a class="button primary" href="{% url 'sales:create' %}">New Sale</a>{% endblock %}
 
 {% block content %}
+{% if receipt_sale %}
+<section class="panel" style="margin-bottom: 16px; border-color: #a7f3d0; background: #ecfdf5;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+        <span style="color: #065f46; font-weight: 600;">Sale #{{ receipt_sale.pk }} saved. Receipt opened in a new page.</span>
+        <a class="button primary" href="{% url 'sales:receipt_pdf' receipt_sale.pk %}" target="_blank" rel="noopener">Print Receipt</a>
+    </div>
+</section>
+{% endif %}
+
 <section class="panel">
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
         <!-- Search Form -->
@@ -43,7 +52,7 @@
                 <tr>
                     <td><strong>SALE-{{ sale.pk|stringformat:"05d" }}</strong></td>
                     <td>{{ sale.customer_name|default:'Walk-in' }}</td>
-                    <td>{{ sale.sold_at|date:'M d, Y H:i' }}</td>
+                    <td>{{ sale.sold_at|date:"M d, Y h:i A" }}</td>
                     <td>
                         <span style="font-size: 13px; color: var(--muted);">
                             {% for item in sale.items.all %}
@@ -51,7 +60,7 @@
                             {% endfor %}
                         </span>
                     </td>
-                    <td><strong>${{ sale.total_amount }}</strong></td>
+                    <td><strong>BDT {{ sale.total_amount }}</strong></td>
                     <td><a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank">Print Receipt</a></td>
                 </tr>
                 {% empty %}
@@ -61,4 +70,14 @@
         </table>
     </div>
 </section>
+{% if receipt_sale %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const receiptWindow = window.open("{% url 'sales:receipt_pdf' receipt_sale.pk %}", "_blank", "noopener");
+        if (receiptWindow) {
+            receiptWindow.focus();
+        }
+    });
+</script>
+{% endif %}
 {% endblock %}

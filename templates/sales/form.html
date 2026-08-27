@@ -2,226 +2,811 @@
 
 {% block title %}{{ title }} - Mtronix{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
-{% block page_subtitle %}Adding a sale automatically deducts stock and blocks overselling.{% endblock %}
+{% block page_subtitle %}Search products, add sale items, and print the receipt after saving.{% endblock %}
 
 {% block content %}
-<section class="panel" style="max-width: 900px; margin: 0 auto;">
+
+<style>
+/* ── Layout ───────────────────────────────────────────────────────── */
+.se-layout {
+    display: grid;
+    grid-template-columns: 1fr 260px;
+    gap: 16px;
+    align-items: start;
+}
+@media (max-width: 820px) {
+    .se-layout { grid-template-columns: 1fr; }
+    .se-sidebar { order: -1; }
+}
+
+/* ── Quick search bar ─────────────────────────────────────────────── */
+.se-quickbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.se-quickbar input[type="search"] {
+    flex: 1;
+    height: 40px;
+    font-size: 14px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+}
+.se-quickbar input[type="search"]:focus { border-color: var(--accent); }
+
+/* ── Search dropdown ──────────────────────────────────────────────── */
+.se-dropdown-wrap { position: relative; flex: 1; }
+.se-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.10);
+    z-index: 200;
+    overflow: hidden;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.se-dropdown-result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--line);
+    transition: background .1s;
+}
+.se-dropdown-result:last-child { border-bottom: none; }
+.se-dropdown-result:hover,
+.se-dropdown-result.se-highlighted { background: var(--surface, #f9fafb); }
+.se-dropdown-result.se-oos { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.se-dr-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.se-dr-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.se-dr-sku  { font-size: 11px; color: var(--muted); }
+.se-dr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.se-dr-price { font-size: 13px; font-weight: 500; }
+.se-dr-stock { font-size: 11px; }
+.stock-ok  { color: #1D9E75; }
+.stock-low { color: #BA7517; }
+.stock-out { color: #E24B4A; }
+.se-dropdown-empty { padding: 12px 14px; font-size: 13px; color: var(--muted); text-align: center; }
+
+/* ── Item rows ────────────────────────────────────────────────────── */
+.se-item-row {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: border-color .15s;
+}
+.se-item-row:focus-within { border-color: var(--accent); }
+
+.se-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.se-row-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.se-row-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.se-chosen-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 10px;
+    background: var(--surface, #f3f4f6);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    font-size: 12px;
+    max-width: 320px;
+    overflow: hidden;
+}
+.se-chip-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.se-chip-sku  { color: var(--muted); font-size: 11px; flex-shrink: 0; }
+.se-chip-clear {
+    background: none; border: none; padding: 0 2px;
+    color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; flex-shrink: 0;
+}
+.se-chip-clear:hover { color: #991b1b; }
+
+.se-fields {
+    display: grid;
+    grid-template-columns: 100px 160px 1fr;
+    gap: 12px;
+    align-items: end;
+}
+@media (max-width: 700px) {
+    .se-fields { grid-template-columns: 1fr 1fr; }
+}
+
+.se-field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+.se-field input,
+.se-field select { width: 100%; box-sizing: border-box; }
+
+.se-line-total {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-end;
+    padding-bottom: 2px;
+}
+.se-line-total label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.se-line-total strong { font-size: 17px; }
+
+.se-stock-hint {
+    display: block;
+    font-size: 11px;
+    margin-top: 5px;
+    color: var(--muted);
+    min-height: 15px;
+}
+.se-stock-hint.danger { color: #E24B4A; font-weight: 500; }
+
+/* Product search inside row */
+.se-product-wrap { position: relative; }
+.se-product-wrap input[type="search"] {
+    width: 100%;
+    box-sizing: border-box;
+    height: 36px;
+    font-size: 13px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+}
+.se-product-wrap input[type="search"]:focus { border-color: var(--accent); }
+
+/* remove btn */
+.se-remove-btn {
+    background: none;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    height: 30px;
+    white-space: nowrap;
+}
+.se-remove-btn:hover { background: #fee2e2; }
+
+/* ── Sidebar ──────────────────────────────────────────────────────── */
+.se-sidebar {
+    position: sticky;
+    top: 16px;
+}
+.se-summary { padding: 20px; }
+.se-summary-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+}
+.se-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+}
+.se-summary-row:last-of-type { border-bottom: none; }
+.se-summary-row.grand {
+    padding-top: 14px;
+    font-size: 15px;
+    font-weight: 500;
+}
+.se-summary-row.grand strong { font-size: 20px; color: var(--accent); }
+.se-summary-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.se-summary-actions .button { text-align: center; justify-content: center; }
+
+/* customer panel */
+.se-customer-panel { padding: 18px 20px; margin-bottom: 16px; }
+.se-customer-panel .field { margin: 0; }
+
+/* items panel */
+.se-items-panel { padding: 18px 20px; }
+.se-items-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.se-items-head h2 { font-size: 15px; font-weight: 500; margin: 0 0 2px; }
+.se-items-head-left { display: flex; flex-direction: column; }
+
+/* stock alert */
+.se-stock-alert {
+    display: none;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #991b1b;
+    margin-bottom: 12px;
+}
+</style>
+
+<section class="sale-entry" style="max-width: 1100px; margin: 0 auto;">
     <form method="post" novalidate id="sale-form">
         {% csrf_token %}
-        
+
         {% if form.non_field_errors %}
-            <div class="alert" style="margin-bottom: 16px;">{{ form.non_field_errors }}</div>
+            <div class="alert" style="margin-bottom: 12px;">{{ form.non_field_errors }}</div>
         {% endif %}
         {% if formset.non_form_errors %}
-            <div class="alert" style="margin-bottom: 16px;">{{ formset.non_form_errors }}</div>
+            <div class="alert" style="margin-bottom: 12px;">{{ formset.non_form_errors }}</div>
         {% endif %}
 
-        <div class="field">
-            <span>Customer Name</span>
-            {{ form.customer_name }}
-            {% for error in form.customer_name.errors %}
-                <strong style="color: #991b1b; display: block; margin-top: 4px;">{{ error }}</strong>
-            {% endfor %}
-        </div>
+        <div class="se-layout">
 
-        {{ formset.management_form }}
+            <!-- ── Main column ── -->
+            <div class="se-main">
 
-        <h3 style="margin-top: 28px; margin-bottom: 12px; font-size: 16px; border-bottom: 1px solid var(--line); padding-bottom: 8px;">Sale Items</h3>
-        
-        <div class="table-wrap" style="margin-bottom: 20px;">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="padding: 8px;">Product</th>
-                        <th style="width: 120px; padding: 8px;">Quantity</th>
-                        <th style="width: 150px; padding: 8px;">Unit Price ($)</th>
-                        <th style="width: 150px; padding: 8px;">Total ($)</th>
-                        <th style="width: 60px; padding: 8px;"></th>
-                    </tr>
-                </thead>
-                <tbody id="formset-container">
-                    {% for item_form in formset %}
-                    <tr class="formset-row" id="row-{{ forloop.counter0 }}">
-                        <td style="padding: 8px; vertical-align: top;">
-                            {{ item_form.product }}
+                <!-- Customer + quick search -->
+                <div class="panel se-customer-panel">
+                    <div class="field" style="margin-bottom: 14px;">
+                        <span style="font-size: 13px;">Customer name <span style="color: var(--muted); font-weight: 400;">(optional)</span></span>
+                        {{ form.customer_name }}
+                        {% for error in form.customer_name.errors %}
+                            <strong style="color: #991b1b; font-size: 12px; display: block; margin-top: 4px;">{{ error }}</strong>
+                        {% endfor %}
+                    </div>
+
+                    <div>
+                        <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-bottom: 8px;">Quick add</span>
+                        <div class="se-quickbar">
+                            <div class="se-dropdown-wrap" id="quick-wrap">
+                                <input id="quick-search" type="search" autocomplete="off" placeholder="Search by product name or SKU…" aria-label="Quick product search" aria-autocomplete="list" aria-controls="quick-dropdown">
+                                <div class="se-dropdown" id="quick-dropdown" hidden role="listbox"></div>
+                            </div>
+                            <button class="button primary" type="button" id="quick-add-btn" style="height: 40px; white-space: nowrap;">Add item</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items -->
+                <div class="panel se-items-panel">
+                    <div class="se-items-head">
+                        <div class="se-items-head-left">
+                            <h2>Sale items</h2>
+                            <span id="item-count" style="font-size: 12px; color: var(--muted);">0 items</span>
+                        </div>
+                        <button type="button" class="button" id="add-item-btn">+ Empty row</button>
+                    </div>
+
+                    <div class="se-stock-alert" id="stock-alert">
+                        ⚠ One or more items exceed available stock. Adjust quantities before saving.
+                    </div>
+
+                    {{ formset.management_form }}
+
+                    <div id="formset-container">
+                        {% for item_form in formset %}
+                        <div class="se-item-row" id="row-{{ forloop.counter0 }}" data-index="{{ forloop.counter0 }}">
+                            <div class="se-row-header">
+                                <div class="se-row-label">
+                                    <span class="se-row-num">{{ forloop.counter }}</span>
+                                    <div class="se-chosen-chip" id="chip-{{ forloop.counter0 }}" style="display: none;"></div>
+                                </div>
+                                <button type="button" class="se-remove-btn remove-row-btn">Remove</button>
+                            </div>
+
+                            <div class="se-product-wrap" id="pwrap-{{ forloop.counter0 }}">
+                                <input class="product-search-input" type="search" autocomplete="off"
+                                    placeholder="Search product…"
+                                    data-index="{{ forloop.counter0 }}"
+                                    aria-label="Search product">
+                                <div class="se-dropdown product-dropdown" id="pdrop-{{ forloop.counter0 }}" hidden></div>
+                            </div>
+
+                            <div style="display: none;">{{ item_form.product }}</div>
+                            <small class="se-stock-hint" id="hint-{{ forloop.counter0 }}">Select a product to see stock.</small>
+
                             {% for error in item_form.product.errors %}
-                                <strong style="color: #991b1b; display: block; font-size: 11px; margin-top: 4px;">{{ error }}</strong>
+                                <strong style="color: #991b1b; font-size: 12px; display: block; margin-top: 4px;">{{ error }}</strong>
                             {% endfor %}
-                        </td>
-                        <td style="padding: 8px; vertical-align: top;">
-                            {{ item_form.quantity }}
-                            {% for error in item_form.quantity.errors %}
-                                <strong style="color: #991b1b; display: block; font-size: 11px; margin-top: 4px;">{{ error }}</strong>
-                            {% endfor %}
-                        </td>
-                        <td style="padding: 8px; vertical-align: top;">
-                            {{ item_form.unit_price }}
-                            {% for error in item_form.unit_price.errors %}
-                                <strong style="color: #991b1b; display: block; font-size: 11px; margin-top: 4px;">{{ error }}</strong>
-                            {% endfor %}
-                        </td>
-                        <td style="padding: 8px; vertical-align: middle;">
-                            <span class="row-total" style="font-weight: bold; font-size: 15px;">0.00</span>
-                        </td>
-                        <td style="padding: 8px; text-align: right; vertical-align: middle;">
-                            <button type="button" class="button remove-row-btn" style="color: #991b1b; border-color: #fca5a5; background: #fee2e2; padding: 0 10px; min-height: 30px;">✕</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 15px;">
-            <button type="button" class="button" id="add-item-btn" style="border-color: var(--accent); color: var(--accent); font-weight: bold;">+ Add Product</button>
-            <div style="font-size: 18px; font-weight: bold;">
-                Grand Total: <span id="grand-total" style="color: var(--accent); font-size: 22px;">$0.00</span>
+                            <div class="se-fields" style="margin-top: 12px;">
+                                <div class="se-field">
+                                    <label>Qty</label>
+                                    {{ item_form.quantity }}
+                                    {% for error in item_form.quantity.errors %}
+                                        <strong style="color: #991b1b; font-size: 12px;">{{ error }}</strong>
+                                    {% endfor %}
+                                </div>
+                                <div class="se-field">
+                                    <label>Unit price (BDT)</label>
+                                    {{ item_form.unit_price }}
+                                    {% for error in item_form.unit_price.errors %}
+                                        <strong style="color: #991b1b; font-size: 12px;">{{ error }}</strong>
+                                    {% endfor %}
+                                </div>
+                                <div class="se-line-total">
+                                    <label>Line total</label>
+                                    <strong class="row-total">BDT 0.00</strong>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="form-actions">
-            <a class="button" href="{% url 'sales:list' %}">Cancel</a>
-            <button class="button primary" type="submit">Save Sale</button>
+            <!-- ── Sidebar ── -->
+            <aside class="se-sidebar">
+                <div class="panel se-summary">
+                    <p class="se-summary-title">Sale summary</p>
+                    <div class="se-summary-row">
+                        <span>Lines</span>
+                        <strong id="total-lines">0</strong>
+                    </div>
+                    <div class="se-summary-row">
+                        <span>Total qty</span>
+                        <strong id="total-qty">0</strong>
+                    </div>
+                    <div class="se-summary-row grand">
+                        <span>Grand total</span>
+                        <strong id="grand-total">BDT 0.00</strong>
+                    </div>
+                    <div class="se-summary-actions">
+                        <button class="button primary" type="submit">Save sale</button>
+                        <a class="button" href="{% url 'sales:list' %}">Cancel</a>
+                    </div>
+                </div>
+            </aside>
         </div>
     </form>
 </section>
 
-<!-- Empty Form Template for JavaScript -->
+<!-- Empty row template -->
 <template id="empty-form-template">
-    <tr class="formset-row" id="row-__prefix__">
-        <td style="padding: 8px; vertical-align: top;">
-            {{ formset.empty_form.product }}
-        </td>
-        <td style="padding: 8px; vertical-align: top;">
-            {{ formset.empty_form.quantity }}
-        </td>
-        <td style="padding: 8px; vertical-align: top;">
-            {{ formset.empty_form.unit_price }}
-        </td>
-        <td style="padding: 8px; vertical-align: middle;">
-            <span class="row-total" style="font-weight: bold; font-size: 15px;">0.00</span>
-        </td>
-        <td style="padding: 8px; text-align: right; vertical-align: middle;">
-            <button type="button" class="button remove-row-btn" style="color: #991b1b; border-color: #fca5a5; background: #fee2e2; padding: 0 10px; min-height: 30px;">✕</button>
-        </td>
-    </tr>
+    <div class="se-item-row" id="row-__prefix__" data-index="__prefix__">
+        <div class="se-row-header">
+            <div class="se-row-label">
+                <span class="se-row-num">–</span>
+                <div class="se-chosen-chip" id="chip-__prefix__" style="display: none;"></div>
+            </div>
+            <button type="button" class="se-remove-btn remove-row-btn">Remove</button>
+        </div>
+
+        <div class="se-product-wrap" id="pwrap-__prefix__">
+            <input class="product-search-input" type="search" autocomplete="off"
+                placeholder="Search product…"
+                data-index="__prefix__"
+                aria-label="Search product">
+            <div class="se-dropdown product-dropdown" id="pdrop-__prefix__" hidden></div>
+        </div>
+
+        <div style="display: none;">{{ formset.empty_form.product }}</div>
+        <small class="se-stock-hint" id="hint-__prefix__">Select a product to see stock.</small>
+
+        <div class="se-fields" style="margin-top: 12px;">
+            <div class="se-field">
+                <label>Qty</label>
+                {{ formset.empty_form.quantity }}
+            </div>
+            <div class="se-field">
+                <label>Unit price (BDT)</label>
+                {{ formset.empty_form.unit_price }}
+            </div>
+            <div class="se-line-total">
+                <label>Line total</label>
+                <strong class="row-total">BDT 0.00</strong>
+            </div>
+        </div>
+    </div>
 </template>
 
+{{ products_catalog|json_script:"products-catalog-data" }}
+
 <script>
-    // Inject the product price map from Django
-    const productsPriceMap = {{ products_json|safe }};
+document.addEventListener('DOMContentLoaded', () => {
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const formsetContainer = document.getElementById('formset-container');
-        const addItemBtn = document.getElementById('add-item-btn');
-        const emptyTemplate = document.getElementById('empty-form-template');
-        const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
+    // ── Data ────────────────────────────────────────────────────────────────
+    const catalog = JSON.parse(document.getElementById('products-catalog-data').textContent || '[]');
+    const byId    = new Map(catalog.map(p => [String(p.id), p]));
 
-        // Function to recalculate row subtotal and grand total
-        function calculateTotals() {
-            let grandTotal = 0;
-            const rows = formsetContainer.querySelectorAll('.formset-row');
-            
-            rows.forEach(row => {
-                const qtyInput = row.querySelector('input[name$="-quantity"]');
-                const priceInput = row.querySelector('input[name$="-unit_price"]');
-                const totalSpan = row.querySelector('.row-total');
-                
-                const qty = parseFloat(qtyInput.value) || 0;
-                const price = parseFloat(priceInput.value) || 0;
-                const subtotal = qty * price;
-                
-                totalSpan.textContent = subtotal.toFixed(2);
-                grandTotal += subtotal;
-            });
-            
-            document.getElementById('grand-total').textContent = '$' + grandTotal.toFixed(2);
+    // Track selected product id per row: { rowIndex -> productId }
+    const selectedMap = {};
+
+    // ── Utilities ───────────────────────────────────────────────────────────
+    function money(v)  { return 'BDT ' + parseFloat(v || 0).toFixed(2); }
+    function esc(s)    { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function stockClass(p) {
+        const stock = p.stock ?? 0;
+        if (stock === 0) return ['stock-out', 'Out of stock'];
+        if (stock <= 5)  return ['stock-low', `Only ${stock} left`];
+        return ['stock-ok', `${stock} in stock`];
+    }
+
+    function matchProducts(q) {
+        const t = q.trim().toLowerCase();
+        return (t ? catalog.filter(p => `${p.name} ${p.sku}`.toLowerCase().includes(t)) : catalog).slice(0, 10);
+    }
+
+    // ── Dropdown builder ────────────────────────────────────────────────────
+    function buildDropdown(results, onPick) {
+        const dd = document.createElement('div');
+        if (!results.length) {
+            dd.innerHTML = `<div class="se-dropdown-empty">No matching products</div>`;
+            return dd;
+        }
+        results.forEach((p, i) => {
+            const oos = (p.stock ?? 0) === 0;
+            const [cls, label] = stockClass(p);
+            const div = document.createElement('div');
+            div.className = 'se-dropdown-result' + (oos ? ' se-oos' : '') + (i === 0 ? ' se-highlighted' : '');
+            div.setAttribute('role', 'option');
+            div.dataset.pid = p.id;
+            div.innerHTML = `
+                <div class="se-dr-left">
+                    <span class="se-dr-name">${esc(p.name)}</span>
+                    <span class="se-dr-sku">${esc(p.sku)}</span>
+                </div>
+                <div class="se-dr-right">
+                    <span class="se-dr-price">${money(p.price)}</span>
+                    <span class="se-dr-stock ${cls}">${label}</span>
+                </div>`;
+            if (!oos) div.addEventListener('mousedown', e => { e.preventDefault(); onPick(p); });
+            dd.appendChild(div);
+        });
+        return dd;
+    }
+
+    function showDropdown(container, results, onPick) {
+        container.innerHTML = '';
+        container.appendChild(buildDropdown(results, onPick));
+        container.hidden = false;
+    }
+
+    function hideDropdown(dd) { if (dd) dd.hidden = true; }
+
+    function handleArrowKeys(e, dd, onEnter) {
+        const items = [...dd.querySelectorAll('.se-dropdown-result:not(.se-oos)')];
+        if (!items.length) return;
+        let idx = items.findIndex(i => i.classList.contains('se-highlighted'));
+        if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); }
+        else if (e.key === 'Enter')  { e.preventDefault(); if (items[idx]) onEnter(items[idx].dataset.pid); return; }
+        else if (e.key === 'Escape') { hideDropdown(dd); return; }
+        else return;
+        items.forEach(i => i.classList.remove('se-highlighted'));
+        if (items[idx]) items[idx].classList.add('se-highlighted');
+    }
+
+    // ── Row: select / clear product ─────────────────────────────────────────
+    function getRow(index) { return document.getElementById(`row-${index}`); }
+
+    function selectProductForRow(index, product) {
+        const row     = getRow(index);
+        if (!row) return;
+        selectedMap[index] = String(product.id);
+
+        // Hidden select
+        const hiddenSel = row.querySelector('select[name$="-product"]');
+        if (hiddenSel) hiddenSel.value = String(product.id);
+
+        // Price
+        const priceInp = row.querySelector('input[name$="-unit_price"]');
+        if (priceInp) priceInp.value = product.price;
+
+        // Default qty
+        const qtyInp = row.querySelector('input[name$="-quantity"]');
+        if (qtyInp && (!qtyInp.value || parseFloat(qtyInp.value) <= 0)) qtyInp.value = '1';
+
+        // Show chip, hide search
+        const chip    = document.getElementById(`chip-${index}`);
+        const searchI = row.querySelector('.product-search-input');
+        const pdrop   = document.getElementById(`pdrop-${index}`);
+        if (chip) {
+            chip.innerHTML = `
+                <span class="se-chip-name">${esc(product.name)}</span>
+                <span class="se-chip-sku">${esc(product.sku)}</span>
+                <button class="se-chip-clear" type="button" aria-label="Change product" data-index="${index}">✕</button>`;
+            chip.style.display = 'inline-flex';
+            chip.querySelector('.se-chip-clear').addEventListener('click', () => clearProductForRow(index));
+        }
+        if (searchI) { searchI.style.display = 'none'; }
+        hideDropdown(pdrop);
+
+        updateStockHint(index);
+        calculateTotals();
+    }
+
+    function clearProductForRow(index) {
+        delete selectedMap[index];
+        const row = getRow(index);
+        if (!row) return;
+        const hiddenSel = row.querySelector('select[name$="-product"]');
+        if (hiddenSel) hiddenSel.value = '';
+        const chip    = document.getElementById(`chip-${index}`);
+        const searchI = row.querySelector('.product-search-input');
+        if (chip)    { chip.style.display = 'none'; chip.innerHTML = ''; }
+        if (searchI) { searchI.style.display = ''; searchI.value = ''; searchI.focus(); }
+        updateStockHint(index);
+        calculateTotals();
+        // re-open dropdown
+        const pdrop = document.getElementById(`pdrop-${index}`);
+        showDropdown(pdrop, catalog.slice(0, 10), p => selectProductForRow(index, p));
+    }
+
+    // ── Stock hint ──────────────────────────────────────────────────────────
+    function updateStockHint(index) {
+        const hint = document.getElementById(`hint-${index}`);
+        if (!hint) return;
+        const pid = selectedMap[index];
+        const product = pid ? byId.get(pid) : null;
+        if (!product) { hint.textContent = 'Select a product to see stock.'; hint.className = 'se-stock-hint'; return; }
+        const [cls, label] = stockClass(product);
+        hint.textContent = `Stock: ${label}`;
+        hint.className   = 'se-stock-hint' + (cls === 'stock-out' ? ' danger' : '');
+    }
+
+    // ── Totals + alerts ─────────────────────────────────────────────────────
+    function calculateTotals() {
+        let grand = 0, qty = 0, overstock = false;
+        document.querySelectorAll('.se-item-row').forEach(row => {
+            const index    = row.dataset.index;
+            const qtyInp   = row.querySelector('input[name$="-quantity"]');
+            const priceInp = row.querySelector('input[name$="-unit_price"]');
+            const totalEl  = row.querySelector('.row-total');
+            const q = parseFloat(qtyInp?.value) || 0;
+            const p = parseFloat(priceInp?.value) || 0;
+            const sub = q * p;
+            if (totalEl) totalEl.textContent = money(sub);
+            grand += sub; qty += q;
+
+            // overstock check
+            const pid = selectedMap[index];
+            if (pid) {
+                const prod = byId.get(pid);
+                const avail = prod?.stock ?? 0;
+                if (q > avail) overstock = true;
+            }
+        });
+
+        const rows = document.querySelectorAll('.se-item-row').length;
+        document.getElementById('grand-total').textContent  = money(grand);
+        document.getElementById('total-qty').textContent    = qty;
+        document.getElementById('total-lines').textContent  = rows;
+        document.getElementById('item-count').textContent   = rows === 1 ? '1 item' : `${rows} items`;
+        document.getElementById('stock-alert').style.display = overstock ? 'block' : 'none';
+    }
+
+    // ── Row listeners ───────────────────────────────────────────────────────
+    function setupRowListeners(row) {
+        const index   = row.dataset.index;
+        const searchI = row.querySelector('.product-search-input');
+        const pdrop   = document.getElementById(`pdrop-${index}`);
+        const qtyInp  = row.querySelector('input[name$="-quantity"]');
+        const priceInp= row.querySelector('input[name$="-unit_price"]');
+        const removeB = row.querySelector('.remove-row-btn');
+
+        // Hide the Django select from tab order
+        const hiddenSel = row.querySelector('select[name$="-product"]');
+        if (hiddenSel) { hiddenSel.tabIndex = -1; hiddenSel.setAttribute('aria-hidden','true'); }
+
+        // If a product was pre-selected (edit page), restore chip
+        if (hiddenSel?.value) {
+            const p = byId.get(hiddenSel.value);
+            if (p) selectProductForRow(index, p);
         }
 
-        // Hook listeners to a specific row
-        function setupRowListeners(row) {
-            const productSelect = row.querySelector('select[name$="-product"]');
-            const qtyInput = row.querySelector('input[name$="-quantity"]');
-            const priceInput = row.querySelector('input[name$="-unit_price"]');
-            const removeBtn = row.querySelector('.remove-row-btn');
-
-            // Autopopulate price when product is selected
-            productSelect.addEventListener('change', () => {
-                const selectedProductId = productSelect.value;
-                if (selectedProductId && productsPriceMap[selectedProductId]) {
-                    priceInput.value = productsPriceMap[selectedProductId];
-                } else {
-                    priceInput.value = '';
-                }
-                
-                // Default quantity to 1 if empty or 0
-                if (!qtyInput.value || parseFloat(qtyInput.value) <= 0) {
-                    qtyInput.value = '1';
-                }
-                
-                calculateTotals();
+        if (searchI) {
+            searchI.addEventListener('input', () => {
+                showDropdown(pdrop, matchProducts(searchI.value), p => selectProductForRow(index, p));
             });
+            searchI.addEventListener('focus', () => {
+                showDropdown(pdrop, matchProducts(searchI.value), p => selectProductForRow(index, p));
+            });
+            searchI.addEventListener('keydown', e => {
+                if (!pdrop.hidden) handleArrowKeys(e, pdrop, pid => {
+                    const p = byId.get(String(pid));
+                    if (p) selectProductForRow(index, p);
+                });
+            });
+        }
 
-            // Recalculate on inputs change
-            qtyInput.addEventListener('input', calculateTotals);
-            priceInput.addEventListener('input', calculateTotals);
+        if (qtyInp)   qtyInp.addEventListener('input',  calculateTotals);
+        if (priceInp) priceInp.addEventListener('input', calculateTotals);
 
-            // Remove row button
-            removeBtn.addEventListener('click', () => {
-                // If there is only one row left, don't remove it
-                if (formsetContainer.querySelectorAll('.formset-row').length <= 1) {
+        if (removeB) {
+            removeB.addEventListener('click', () => {
+                if (document.querySelectorAll('.se-item-row').length <= 1) {
                     alert('A sale must contain at least one item.');
                     return;
                 }
+                delete selectedMap[index];
                 row.remove();
                 reindexRows();
                 calculateTotals();
             });
         }
+    }
 
-        // Reindex rows to make sure form indices are contiguous for Django Formset parser
-        function reindexRows() {
-            const rows = formsetContainer.querySelectorAll('.formset-row');
-            rows.forEach((row, index) => {
-                row.id = `row-${index}`;
-                row.querySelectorAll('input, select').forEach(element => {
-                    const name = element.getAttribute('name');
-                    if (name) {
-                        element.setAttribute('name', name.replace(/items-\d+-/, `items-${index}-`));
-                    }
-                    const id = element.getAttribute('id');
-                    if (id) {
-                        element.setAttribute('id', id.replace(/id_items-\d+-/, `id_items-${index}-`));
-                    }
+    // ── Reindex ─────────────────────────────────────────────────────────────
+    function reindexRows() {
+        document.querySelectorAll('.se-item-row').forEach((row, newIdx) => {
+            const old = row.dataset.index;
+            row.id           = `row-${newIdx}`;
+            row.dataset.index = newIdx;
+
+            const chip  = row.querySelector('.se-chosen-chip');
+            if (chip) chip.id = `chip-${newIdx}`;
+            const pwrap = row.querySelector('.se-product-wrap');
+            if (pwrap) pwrap.id = `pwrap-${newIdx}`;
+            const pdrop = row.querySelector('.product-dropdown');
+            if (pdrop) pdrop.id = `pdrop-${newIdx}`;
+            const hint  = row.querySelector('.se-stock-hint');
+            if (hint) hint.id = `hint-${newIdx}`;
+            const num   = row.querySelector('.se-row-num');
+            if (num) num.textContent = newIdx + 1;
+            const si    = row.querySelector('.product-search-input');
+            if (si) si.dataset.index = newIdx;
+
+            row.querySelectorAll('input, select').forEach(el => {
+                ['name','id','for'].forEach(attr => {
+                    const v = el.getAttribute(attr);
+                    if (v) el.setAttribute(attr, v.replace(/items-\d+-/, `items-${newIdx}-`));
                 });
             });
-            totalFormsInput.value = rows.length;
+
+            if (selectedMap[old] !== undefined && String(old) !== String(newIdx)) {
+                selectedMap[newIdx] = selectedMap[old];
+                delete selectedMap[old];
+            }
+        });
+        document.getElementById('id_items-TOTAL_FORMS').value =
+            document.querySelectorAll('.se-item-row').length;
+    }
+
+    // ── Add row ─────────────────────────────────────────────────────────────
+    function addEmptyRow() {
+        const count = document.querySelectorAll('.se-item-row').length;
+        const html  = document.getElementById('empty-form-template').innerHTML
+            .replace(/__prefix__/g, count);
+        const tmp   = document.createElement('div');
+        tmp.innerHTML = html;
+        const newRow = tmp.firstElementChild;
+        newRow.dataset.index = count;
+        document.getElementById('formset-container').appendChild(newRow);
+        document.getElementById('id_items-TOTAL_FORMS').value = count + 1;
+        setupRowListeners(newRow);
+        return newRow;
+    }
+
+    function findEmptyRow() {
+        return Array.from(document.querySelectorAll('.se-item-row')).find(row => {
+            const s = row.querySelector('select[name$="-product"]');
+            return !s?.value;
+        });
+    }
+
+    function addProductLine(product) {
+        const row = findEmptyRow() || addEmptyRow();
+        const index = row.dataset.index;
+        selectProductForRow(index, product);
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        row.querySelector('input[name$="-quantity"]')?.focus();
+    }
+
+    // ── Quick search bar ────────────────────────────────────────────────────
+    const quickInput = document.getElementById('quick-search');
+    const quickDrop  = document.getElementById('quick-dropdown');
+    const quickBtn   = document.getElementById('quick-add-btn');
+
+    quickInput.addEventListener('input', () => {
+        showDropdown(quickDrop, matchProducts(quickInput.value), p => {
+            addProductLine(p);
+            quickInput.value = '';
+            hideDropdown(quickDrop);
+        });
+    });
+    quickInput.addEventListener('focus', () => {
+        showDropdown(quickDrop, matchProducts(quickInput.value), p => {
+            addProductLine(p);
+            quickInput.value = '';
+            hideDropdown(quickDrop);
+        });
+    });
+    quickInput.addEventListener('keydown', e => {
+        if (!quickDrop.hidden) {
+            handleArrowKeys(e, quickDrop, pid => {
+                const p = byId.get(String(pid));
+                if (p) { addProductLine(p); quickInput.value = ''; hideDropdown(quickDrop); }
+            });
         }
+        if (e.key === 'Enter' && quickDrop.hidden) {
+            const m = matchProducts(quickInput.value)[0];
+            if (m) { addProductLine(m); quickInput.value = ''; }
+        }
+    });
+    quickBtn.addEventListener('click', () => {
+        const m = matchProducts(quickInput.value)[0];
+        if (m) { addProductLine(m); quickInput.value = ''; hideDropdown(quickDrop); }
+        else quickInput.focus();
+    });
 
-        // Add item row handler
-        addItemBtn.addEventListener('click', () => {
-            const formCount = formsetContainer.querySelectorAll('.formset-row').length;
-            const newRowHtml = emptyTemplate.innerHTML.replace(/__prefix__/g, formCount);
-            
-            // Temporary container to parse HTML string
-            const tempDiv = document.createElement('tbody');
-            tempDiv.innerHTML = newRowHtml;
-            const newRow = tempDiv.firstElementChild;
-            
-            formsetContainer.appendChild(newRow);
-            totalFormsInput.value = formCount + 1;
-            
-            setupRowListeners(newRow);
-            calculateTotals();
-        });
-
-        // Initialize listeners on initial rows
-        const initialRows = formsetContainer.querySelectorAll('.formset-row');
-        initialRows.forEach(row => {
-            setupRowListeners(row);
-        });
-        
+    // ── Add empty row btn ───────────────────────────────────────────────────
+    document.getElementById('add-item-btn').addEventListener('click', () => {
+        const row = addEmptyRow();
+        row.querySelector('.product-search-input')?.focus();
         calculateTotals();
     });
+
+    // ── Click outside closes dropdowns ──────────────────────────────────────
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#quick-wrap')) hideDropdown(quickDrop);
+        document.querySelectorAll('.se-product-wrap').forEach(wrap => {
+            if (!wrap.contains(e.target)) {
+                const dd = wrap.querySelector('.product-dropdown');
+                if (dd) hideDropdown(dd);
+            }
+        });
+    });
+
+    // ── Form submit guard ───────────────────────────────────────────────────
+    document.getElementById('sale-form').addEventListener('submit', e => {
+        if (!Object.keys(selectedMap).length) {
+            e.preventDefault();
+            alert('Please add at least one product before saving.');
+            return;
+        }
+        let over = false;
+        document.querySelectorAll('.se-item-row').forEach(row => {
+            const index = row.dataset.index;
+            const pid   = selectedMap[index];
+            if (!pid) return;
+            const prod  = byId.get(pid);
+            const qty   = parseFloat(row.querySelector('input[name$="-quantity"]')?.value) || 0;
+            const avail = prod?.stock ?? 0;
+            if (qty > avail) over = true;
+        });
+        if (over) {
+            e.preventDefault();
+            alert('One or more items exceed available stock. Please adjust quantities.');
+        }
+    });
+
+    // ── Init ────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.se-item-row').forEach(row => setupRowListeners(row));
+    reindexRows();
+    calculateTotals();
+});
 </script>
+
 {% endblock %}

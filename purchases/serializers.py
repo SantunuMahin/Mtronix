@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from django.db import transaction
 
 from inventory.services import InventoryService
 from purchases.models import Purchase
@@ -23,9 +22,6 @@ class PurchaseSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         try:
-            with transaction.atomic():
-                purchase = Purchase.objects.create(**validated_data)
-                InventoryService.add_stock(purchase.product, purchase.quantity)
-                return purchase
+            return InventoryService.create_purchase(**validated_data)
         except ValueError as exc:
             raise serializers.ValidationError({'quantity': str(exc)}) from exc

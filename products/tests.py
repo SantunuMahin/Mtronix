@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from inventory.models import Inventory
 from products.models import Product
 from products.serializers import ProductSerializer
 
@@ -13,7 +14,7 @@ class ProductSerializerTests(TestCase):
             purchase_price='1.00',
             selling_price='2.00',
         )
-        product.inventory.delete()
+        Inventory.objects.filter(product=product).delete()
 
         self.assertEqual(ProductSerializer(product).data['current_stock'], 0)
 

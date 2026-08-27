@@ -7,7 +7,7 @@ from products.serializers import ProductSerializer
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all().order_by('name')
+    queryset = Product.objects.select_related('inventory').order_by('name')
     serializer_class = ProductSerializer
 
 

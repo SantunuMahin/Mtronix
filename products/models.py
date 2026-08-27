@@ -11,5 +11,9 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def total_stock(self):
+        return self.inventory.quantity if hasattr(self, 'inventory') else 0
+
     def __str__(self):
         return f'{self.name} ({self.sku})'

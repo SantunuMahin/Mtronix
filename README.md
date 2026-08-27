@@ -1,6 +1,6 @@
 # Mtronix
 
-Django inventory and sales MVP with products, suppliers, stock tracking, purchases, sales, REST APIs, JWT endpoints, and a starter dashboard.
+Django inventory and sales MVP with products, suppliers, stock tracking, purchases, sales, and a starter dashboard.
 
 ## Setup
 
@@ -21,13 +21,3 @@ $env:POSTGRES_PASSWORD='password'
 $env:POSTGRES_HOST='localhost'
 $env:POSTGRES_PORT='5432'
 ```
-
-## API Routes
-
-- `GET/POST /api/products/`
-- `GET /api/inventory/`
-- `GET/POST /api/suppliers/`
-- `GET/POST /api/purchases/`
-- `GET/POST /api/sales/`
-- `POST /api/auth/token/`
-- `POST /api/auth/token/refresh/`

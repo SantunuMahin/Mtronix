@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from django.db import transaction
 
 from inventory.services import InventoryService
 from sales.models import Sale, SaleItem
@@ -31,13 +30,6 @@ class SaleSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop('items')
         try:
-            with transaction.atomic():
-                sale = Sale.objects.create(**validated_data)
-                for item_data in items_data:
-                    product = item_data['product']
-                    quantity = item_data['quantity']
-                    InventoryService.remove_stock(product, quantity)
-                    SaleItem.objects.create(sale=sale, **item_data)
-                return sale
+            return InventoryService.create_sale(items=items_data, **validated_data)
         except ValueError as exc:
             raise serializers.ValidationError({'items': str(exc)}) from exc

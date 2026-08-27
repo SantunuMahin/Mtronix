@@ -19,7 +19,7 @@
                     <td>{{ product.sku }}</td>
                     <td>{{ product.purchase_price }}</td>
                     <td>{{ product.selling_price }}</td>
-                    <td>{{ product.inventory.quantity|default:0 }}</td>
+                    <td>{{ product.total_stock }}</td>
                     <td><a class="button" href="{% url 'products:update' product.pk %}">Edit</a></td>
                 </tr>
                 {% empty %}

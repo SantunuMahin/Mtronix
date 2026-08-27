@@ -18,7 +18,7 @@
                     <td>{{ item.product.sku }}</td>
                     <td><span class="badge">{{ item.quantity }}</span></td>
                     <td>{{ item.product.low_stock_threshold }}</td>
-                    <td>{{ item.updated_at|date:'M d, Y H:i' }}</td>
+                    <td>{{ item.updated_at|date:"M d, Y h:i A" }}</td>
                     <td class="actions">
                         <a class="button" href="{% url 'inventory:add_stock' item.pk %}">Add</a>
                         <a class="button" href="{% url 'inventory:remove_stock' item.pk %}">Remove</a>

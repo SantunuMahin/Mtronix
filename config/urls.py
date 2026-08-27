@@ -16,21 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from inventory.views import InventoryViewSet, dashboard
-from products.views import ProductViewSet
-from purchases.views import PurchaseViewSet
-from sales.views import SaleViewSet
-from suppliers.views import SupplierViewSet
-
-router = DefaultRouter()
-router.register('products', ProductViewSet)
-router.register('inventory', InventoryViewSet)
-router.register('sales', SaleViewSet)
-router.register('purchases', PurchaseViewSet)
-router.register('suppliers', SupplierViewSet)
+from inventory.views import dashboard
 
 urlpatterns = [
     path('', dashboard, name='dashboard'),
@@ -41,7 +28,4 @@ urlpatterns = [
     path('purchases/', include('purchases.urls')),
     path('sales/', include('sales.urls')),
     path('inventory/', include('inventory.urls')),
-    path('api/', include(router.urls)),
-    path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]

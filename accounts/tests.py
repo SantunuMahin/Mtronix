@@ -22,6 +22,13 @@ class UserProfileSignalTests(TestCase):
         self.assertFalse(user.profile.is_manager)
         self.assertFalse(user.profile.is_storekeeper)
 
+    def test_sales_role_helper_property(self):
+        user = User.objects.create_user(username='salesperson', password='testpass123')
+        user.profile.role = UserProfile.SALES
+        user.profile.save()
+
+        self.assertTrue(user.profile.is_sales)
+
 
 class LoginViewTests(TestCase):
     """Login / logout flow tests."""
@@ -76,8 +83,7 @@ class LoginRequiredMiddlewareTests(TestCase):
         response = self.client.get('/accounts/login/')
         self.assertEqual(response.status_code, 200)
 
-    def test_api_endpoints_are_accessible_without_session(self):
-        """API uses JWT, so session middleware must not block it."""
+    def test_unknown_app_page_redirects_to_login(self):
         response = self.client.get('/api/')
-        # DRF returns 200 (browsable API) or 401, never a login redirect
-        self.assertNotEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/accounts/login/', response['Location'])

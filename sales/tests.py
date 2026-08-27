@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from inventory.models import Inventory
 from inventory.services import InventoryService
 from products.models import Product
 from sales.models import Sale, SaleItem
@@ -40,6 +41,24 @@ class SalePageTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'/sales/?receipt={Sale.objects.get().pk}')
         self.assertEqual(Sale.objects.count(), 1)
-        self.product.inventory.refresh_from_db()
-        self.assertEqual(self.product.inventory.quantity, 2)
+        self.assertEqual(Inventory.objects.get(product=self.product).quantity, 2)
+
+    def test_sale_list_with_receipt_opens_pdf_in_new_page(self):
+        InventoryService.add_stock(self.product, 1)
+        sale = InventoryService.create_sale(
+            customer_name='Walk-in',
+            items=[
+                {
+                    'product': self.product,
+                    'quantity': 1,
+                    'unit_price': '2.00',
+                }
+            ],
+        )
+        response = self.client.get(f'/sales/?receipt={sale.pk}')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'/sales/{sale.pk}/receipt.pdf')
+        self.assertContains(response, 'window.open')
