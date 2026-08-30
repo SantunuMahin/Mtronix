@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.db import models
 from django.shortcuts import get_object_or_404, redirect, render
 from rest_framework import viewsets
 
@@ -19,7 +20,16 @@ class ProductViewSet(viewsets.ModelViewSet):
 
 def product_list(request):
     group_id = request.GET.get('group')
+    query = request.GET.get('q', '').strip()
     products = Product.objects.select_related('inventory', 'group').order_by('name')
+
+    if query:
+        products = products.filter(
+            models.Q(name__icontains=query)
+            | models.Q(sku__icontains=query)
+            | models.Q(group__name__icontains=query)
+        )
+
     if group_id:
         if group_id == 'none':
             products = products.filter(group__isnull=True)
@@ -34,6 +44,7 @@ def product_list(request):
             'products': products,
             'groups': groups,
             'selected_group': group_id,
+            'query': query,
         },
     )
 

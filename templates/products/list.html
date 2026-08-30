@@ -12,16 +12,31 @@
 
 {% block content %}
 <section class="panel">
+    <!-- Search Bar & Filters -->
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+        <!-- Search Form -->
+        <form method="get" action="{% url 'products:list' %}" style="display: flex; gap: 8px; flex: 1; min-width: 280px;">
+            {% if selected_group %}
+            <input type="hidden" name="group" value="{{ selected_group }}">
+            {% endif %}
+            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search by product name, SKU, or group..." style="flex: 1; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit;">
+            <button class="button primary" type="submit">Search</button>
+            {% if query or selected_group %}
+            <a class="button" href="{% url 'products:list' %}">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
     <!-- Group Filter Bar -->
     <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
         <span style="color: var(--muted); font-size: 13px; font-weight: 600;">Filter by Group:</span>
-        <a class="button {% if not selected_group %}primary{% endif %}" href="{% url 'products:list' %}" style="padding: 6px 12px; font-size: 13px;">All ({{ products|length }})</a>
+        <a class="button {% if not selected_group %}primary{% endif %}" href="{% url 'products:list' %}{% if query %}?q={{ query }}{% endif %}" style="padding: 6px 12px; font-size: 13px;">All ({{ products|length }})</a>
         {% for grp in groups %}
-        <a class="button {% if selected_group == grp.pk|stringformat:'s' %}primary{% endif %}" href="{% url 'products:list' %}?group={{ grp.pk }}" style="padding: 6px 12px; font-size: 13px;">
+        <a class="button {% if selected_group == grp.pk|stringformat:'s' %}primary{% endif %}" href="{% url 'products:list' %}?group={{ grp.pk }}{% if query %}&q={{ query }}{% endif %}" style="padding: 6px 12px; font-size: 13px;">
             📁 {{ grp.name }}
         </a>
         {% endfor %}
-        <a class="button {% if selected_group == 'none' %}primary{% endif %}" href="{% url 'products:list' %}?group=none" style="padding: 6px 12px; font-size: 13px;">
+        <a class="button {% if selected_group == 'none' %}primary{% endif %}" href="{% url 'products:list' %}?group=none{% if query %}&q={{ query }}{% endif %}" style="padding: 6px 12px; font-size: 13px;">
             Unassigned
         </a>
     </div>

@@ -150,3 +150,19 @@ class ProductPageTests(TestCase):
         res = self.client.post(f'/products/{p.pk}/delete/')
         self.assertEqual(res.status_code, 302)
         self.assertFalse(Product.objects.filter(pk=p.pk).exists())
+
+    def test_product_list_search_by_name_and_sku(self):
+        p1 = Product.objects.create(name='Arduino Uno R3', sku='MCU-001', purchase_price='5.00', selling_price='8.00')
+        p2 = Product.objects.create(name='ESP32 DevKit', sku='MCU-002', purchase_price='4.00', selling_price='7.00')
+        p3 = Product.objects.create(name='Breadboard 830', sku='BRD-830', purchase_price='2.00', selling_price='3.50')
+
+        # Search by name
+        res_name = self.client.get('/products/?q=Arduino')
+        self.assertContains(res_name, 'Arduino Uno R3')
+        self.assertNotContains(res_name, 'ESP32 DevKit')
+        self.assertNotContains(res_name, 'Breadboard 830')
+
+        # Search by SKU
+        res_sku = self.client.get('/products/?q=MCU-002')
+        self.assertContains(res_sku, 'ESP32 DevKit')
+        self.assertNotContains(res_sku, 'Arduino Uno R3')
