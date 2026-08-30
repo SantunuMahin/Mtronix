@@ -2,28 +2,56 @@
 
 {% block title %}Products - Mtronix{% endblock %}
 {% block page_title %}Products{% endblock %}
-{% block page_subtitle %}Manage catalog items, pricing, SKUs, and stock thresholds.{% endblock %}
-{% block header_action %}<a class="button primary" href="{% url 'products:create' %}">New Product</a>{% endblock %}
+{% block page_subtitle %}Manage catalog items, groups, pricing, SKUs, and stock thresholds.{% endblock %}
+{% block header_action %}
+<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="button" href="{% url 'products:group_list' %}">📁 Manage Groups</a>
+    <a class="button primary" href="{% url 'products:create' %}">+ New Product</a>
+</div>
+{% endblock %}
 
 {% block content %}
 <section class="panel">
+    <!-- Group Filter Bar -->
+    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+        <span style="color: var(--muted); font-size: 13px; font-weight: 600;">Filter by Group:</span>
+        <a class="button {% if not selected_group %}primary{% endif %}" href="{% url 'products:list' %}" style="padding: 6px 12px; font-size: 13px;">All ({{ products|length }})</a>
+        {% for grp in groups %}
+        <a class="button {% if selected_group == grp.pk|stringformat:'s' %}primary{% endif %}" href="{% url 'products:list' %}?group={{ grp.pk }}" style="padding: 6px 12px; font-size: 13px;">
+            📁 {{ grp.name }}
+        </a>
+        {% endfor %}
+        <a class="button {% if selected_group == 'none' %}primary{% endif %}" href="{% url 'products:list' %}?group=none" style="padding: 6px 12px; font-size: 13px;">
+            Unassigned
+        </a>
+    </div>
+
     <div class="table-wrap">
         <table data-filter-table>
             <thead>
-                <tr><th>Name</th><th>SKU</th><th>Purchase</th><th>Selling</th><th>Stock</th><th></th></tr>
+                <tr><th>Name</th><th>Group</th><th>SKU</th><th>Purchase</th><th>Selling</th><th>Stock</th><th></th></tr>
             </thead>
             <tbody>
                 {% for product in products %}
                 <tr>
-                    <td>{{ product.name }}</td>
-                    <td>{{ product.sku }}</td>
-                    <td>{{ product.purchase_price }}</td>
-                    <td>{{ product.selling_price }}</td>
-                    <td>{{ product.total_stock }}</td>
+                    <td><strong>{{ product.name }}</strong></td>
+                    <td>
+                        {% if product.group %}
+                        <a href="{% url 'products:list' %}?group={{ product.group.pk }}" style="color: var(--primary); text-decoration: none; font-weight: 500;">
+                            📁 {{ product.group.name }}
+                        </a>
+                        {% else %}
+                        <span style="color: var(--muted);">—</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ product.sku|default:"—" }}</td>
+                    <td>BDT {{ product.purchase_price }}</td>
+                    <td>BDT {{ product.selling_price }}</td>
+                    <td><span class="badge">{{ product.total_stock }}</span></td>
                     <td><a class="button" href="{% url 'products:update' product.pk %}">Edit</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6">No products yet.</td></tr>
+                <tr><td colspan="7" style="text-align: center; padding: 24px;">No products found in this category.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

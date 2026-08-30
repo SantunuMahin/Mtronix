@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Group - Mtronix{% endblock %}
+{% block page_title %}Delete Product Group{% endblock %}
+{% block page_subtitle %}Confirm deletion of product group.{% endblock %}
+
+{% block content %}
+<section class="panel form-panel">
+    <form method="post">
+        {% csrf_token %}
+        <p style="margin-bottom: 16px; font-size: 15px;">
+            Are you sure you want to delete the group <strong>"{{ group.name }}"</strong>?
+        </p>
+        {% if group.products.exists %}
+        <div class="alert" style="margin-bottom: 20px; background: #fffbeb; border-color: #fde68a; color: #92400e; padding: 12px; border-radius: 6px;">
+            ⚠️ This group currently contains <strong>{{ group.products.count }}</strong> product(s). If deleted, those products will remain in the catalog as unassigned (no products will be deleted).
+        </div>
+        {% endif %}
+        <div class="form-actions">
+            <a class="button" href="{% url 'products:group_list' %}">Cancel</a>
+            <button class="button primary" type="submit" style="background: #dc2626; border-color: #dc2626;">Yes, Delete Group</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

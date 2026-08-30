@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Product Groups - Mtronix{% endblock %}
+{% block page_title %}Product Groups{% endblock %}
+{% block page_subtitle %}Organize products into categories and groups for easy filtering and tracking.{% endblock %}
+
+{% block header_action %}
+<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="button" href="{% url 'products:list' %}">← Back to Products</a>
+    <a class="button primary" href="{% url 'products:group_create' %}">+ New Group</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="table-wrap">
+        <table data-filter-table>
+            <thead>
+                <tr>
+                    <th>Group Name</th>
+                    <th>Description</th>
+                    <th>Products Count</th>
+                    <th>Created</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in groups %}
+                <tr>
+                    <td>
+                        <a href="{% url 'products:list' %}?group={{ group.pk }}" style="font-weight: 600; color: var(--primary); text-decoration: none;">
+                            📁 {{ group.name }}
+                        </a>
+                    </td>
+                    <td>{{ group.description|default:"—" }}</td>
+                    <td>
+                        <a class="badge" href="{% url 'products:list' %}?group={{ group.pk }}" style="text-decoration: none;">
+                            {{ group.products.count }} products
+                        </a>
+                    </td>
+                    <td>{{ group.created_at|date:"M d, Y" }}</td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px;">
+                            <a class="button" href="{% url 'products:list' %}?group={{ group.pk }}" title="View products in this group">View</a>
+                            <a class="button" href="{% url 'products:group_update' group.pk %}">Edit</a>
+                            <a class="button" href="{% url 'products:group_delete' group.pk %}" style="color: #dc2626;">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 32px 16px;">
+                        <p style="color: var(--muted); margin-bottom: 12px;">No product groups yet.</p>
+                        <a class="button primary" href="{% url 'products:group_create' %}">Create Your First Group</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -9,8 +9,12 @@
 {% if receipt_sale %}
 <section class="panel" style="margin-bottom: 16px; border-color: #a7f3d0; background: #ecfdf5;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-        <span style="color: #065f46; font-weight: 600;">Sale #{{ receipt_sale.pk }} saved. Receipt opened in a new page.</span>
-        <a class="button primary" href="{% url 'sales:receipt_pdf' receipt_sale.pk %}" target="_blank" rel="noopener">Print Receipt</a>
+        <span style="color: #065f46; font-weight: 600;">Sale #{{ receipt_sale.pk }} saved. Printing receipt...</span>
+        <div style="display: flex; gap: 8px;">
+            <button class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' receipt_sale.pk %}')">🖨️ Print Again</button>
+            <a class="button" href="{% url 'sales:receipt_print' receipt_sale.pk %}" target="_blank">View Receipt</a>
+            <a class="button" href="{% url 'sales:receipt_pdf' receipt_sale.pk %}" target="_blank">PDF</a>
+        </div>
     </div>
 </section>
 {% endif %}
@@ -18,8 +22,8 @@
 <section class="panel">
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
         <!-- Search Form -->
-        <form method="get" style="display: flex; gap: 8px; flex: 1; min-width: 280px;">
-            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search by customer name..." style="flex: 1; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit;">
+        <form method="get" style="display: flex; gap: 8px; flex: 1; min-width: 320px;">
+            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search by Sale ID (e.g. 55 or SALE-00055), customer, or product..." style="flex: 1; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit;">
             <button class="button primary" type="submit">Search</button>
             {% if query %}
             <a class="button" href="{% url 'sales:list' %}">Clear</a>
@@ -44,7 +48,7 @@
                     <th>Date</th>
                     <th>Products Sold</th>
                     <th>Total Amount</th>
-                    <th></th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -61,7 +65,13 @@
                         </span>
                     </td>
                     <td><strong>BDT {{ sale.total_amount }}</strong></td>
-                    <td><a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank">Print Receipt</a></td>
+                    <td>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' sale.pk %}')" title="Print directly to printer">🖨️ Print</button>
+                            <a class="button" href="{% url 'sales:receipt_print' sale.pk %}" target="_blank" title="View receipt">View</a>
+                            <a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" title="Download PDF">PDF</a>
+                        </div>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="6">No sales yet.</td></tr>
@@ -70,14 +80,36 @@
         </table>
     </div>
 </section>
-{% if receipt_sale %}
+
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const receiptWindow = window.open("{% url 'sales:receipt_pdf' receipt_sale.pk %}", "_blank", "noopener");
-        if (receiptWindow) {
-            receiptWindow.focus();
+    function printReceipt(url) {
+        let iframe = document.getElementById('print-receipt-frame');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'print-receipt-frame';
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
         }
+        iframe.onload = () => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                window.open(url, '_blank');
+            }
+        };
+        iframe.src = url;
+    }
+
+    {% if receipt_sale %}
+    document.addEventListener('DOMContentLoaded', () => {
+        printReceipt("{% url 'sales:receipt_print' receipt_sale.pk %}");
     });
+    {% endif %}
 </script>
-{% endif %}
 {% endblock %}

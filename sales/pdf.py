@@ -23,14 +23,9 @@ MTRONIX_PHONE   = '01706-970195'
 MTRONIX_EMAIL   = 'mannanelectronics111@gmail.com'
 
 INTLISOFT_PHONE = '01888-735883'
-INTLISOFT_EMAIL = 'info.intlisoftinnovation@gmail.com'
+INTLISOFT_EMAIL = 'santunukaysarmahin@gmail.com'
 
-MAPS_URL = (
-    'https://www.google.com/maps/dir/23.7174784,90.4200192/'
-    '23.7218447,90.4121045/@23.7197368,90.411174,16z/'
-    'data=!3m1!4b1!4m4!4m3!1m1!4e1!1m0?entry=ttu'
-    '&g_ep=EgoyMDI2MDYwNy4wIKXMDSoASAFQAw%3D%3D'
-)
+MAPS_URL = 'https://maps.google.com/?q=23.7218447,90.4121045'
 
 # ── Page & font constants ────────────────────────────────────────────────────
 PAGE_WIDTH    = 612   # US Letter
@@ -75,8 +70,10 @@ def _qr_pdf_stream(
 
 
 # ── PDF text helpers ─────────────────────────────────────────────────────────
-def _escape_pdf_string(value: str) -> str:
-    return value.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+def _escape_pdf_string(value: Any) -> str:
+    if value is None:
+        return ''
+    return str(value).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
 
 
 def _text_line(y: float, text: str, size: int = 11, x: float = 72, bold: bool = False) -> str:
@@ -115,8 +112,9 @@ class PdfBuilder:
     return builder.build()
     """
 
-    def __init__(self) -> None:
+    def __init__(self, auto_print: bool = False) -> None:
         self._pages: List[List[str]] = []   # one list of operator strings per page
+        self.auto_print = auto_print
 
     def add_page(self, streams: List[str]) -> None:
         self._pages.append(streams)
@@ -158,11 +156,18 @@ class PdfBuilder:
         # We'll write them in order and track offsets.
 
         # Catalog (obj 1)
-        catalog_bytes = (
-            f'{CATALOG} 0 obj\n'
-            f'<< /Type /Catalog /Pages {PAGES} 0 R >>\n'
-            f'endobj\n'
-        ).encode('ascii')
+        if self.auto_print:
+            catalog_bytes = (
+                f'{CATALOG} 0 obj\n'
+                f'<< /Type /Catalog /Pages {PAGES} 0 R /OpenAction << /Type /Action /S /Named /N /Print >> >>\n'
+                f'endobj\n'
+            ).encode('ascii')
+        else:
+            catalog_bytes = (
+                f'{CATALOG} 0 obj\n'
+                f'<< /Type /Catalog /Pages {PAGES} 0 R >>\n'
+                f'endobj\n'
+            ).encode('ascii')
 
         # Pages (obj 2) – Kids list
         kids = ' '.join(f'{num} 0 R' for num in page_obj_nums)
@@ -367,9 +372,9 @@ def _make_footer_ops(
     # QR on last page only
     if is_last and qr_matrix:
         qr_size_pts = len(qr_matrix) * qr_cell
-        qr_x        = PAGE_WIDTH - 36 - qr_size_pts
-        qr_y_bottom = 30
-        ops.append(_text_line(qr_y_bottom + qr_size_pts + 4, 'Scan for location', 8, int(qr_x)))
+        qr_x        = PAGE_WIDTH - 54 - qr_size_pts
+        qr_y_bottom = 24
+        ops.append(_text_line(qr_y_bottom + qr_size_pts + 3, 'Scan for location', 7, int(qr_x)))
         ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y_bottom, qr_cell))
 
     return ops
@@ -382,7 +387,7 @@ def build_sale_receipt_pdf(sale) -> bytes:
     customer = sale.customer_name or 'Walk-in'
 
     qr_matrix = _build_qr_matrix(MAPS_URL)
-    qr_cell   = 2.0
+    qr_cell   = 1.1
 
     # Pre-built footer text operators (same on every page)
     footer_text_ops = [
@@ -432,17 +437,17 @@ def build_sale_receipt_pdf(sale) -> bytes:
     def footer(page_no: int, is_last: bool) -> List[str]:
         return _make_footer_ops(page_no, is_last, qr_matrix, qr_cell, footer_text_ops)
 
-    builder = PdfBuilder()
+    builder = PdfBuilder(auto_print=True)
     pc = PageComposer(builder, header_fn=header, footer_fn=footer)
 
     # ── Item rows ────────────────────────────────────────────────────────────
-    for item in sale.items.select_related('product', 'location').all():
+    for item in sale.items.select_related('product').all():
         pc.ensure(22)
         y = pc.y
 
         # Place all column text at the same Y position (single row)
         pc._streams.append(_text_line(y, item.product.name,          11,  72))
-        pc._streams.append(_text_line(y, item.product.sku,           11, 270))
+        pc._streams.append(_text_line(y, item.product.sku or '—',    11, 270))
         pc._streams.append(_text_line(y, str(item.quantity),         11, 355))
         pc._streams.append(_text_line(y, f'{item.unit_price:.2f}',   11, 405))
         pc._streams.append(_text_line(y, f'{item.total_amount:.2f}', 11, 500))
@@ -468,7 +473,7 @@ def build_sale_receipt_pdf(sale) -> bytes:
 def build_sales_report_pdf(report_data: dict[str, Any]) -> bytes:
     """Generate a multi-page sales summary report PDF."""
     qr_matrix = _build_qr_matrix(MAPS_URL)
-    qr_cell   = 2.0
+    qr_cell   = 1.1
 
     # generated_at may be a datetime object, an already-formatted string, or None.
     # Only pass it through _bd_time() if it's an actual datetime; otherwise use as-is
@@ -529,8 +534,9 @@ def build_sales_report_pdf(report_data: dict[str, Any]) -> bytes:
         pc.add_line('No sales recorded in this period.', 11)
     else:
         for idx, item in enumerate(top_selling[:5], 1):
+            sku_suffix = f' ({item["product__sku"]})' if item.get("product__sku") else ''
             line = (
-                f'{idx}. {item["product__name"]} ({item["product__sku"]})'
+                f'{idx}. {item["product__name"]}{sku_suffix}'
                 f'  —  {item["total_qty"]} sold  |  BDT {item["total_sales"]:.2f}'
             )
             pc.add_line(line, 11)
@@ -563,10 +569,10 @@ def build_sales_report_pdf(report_data: dict[str, Any]) -> bytes:
             y = pc.y
 
             # Place all column text at the same Y position (single row)
-            pc._streams.append(_text_line(y, item['product__name'],        10,  72))
-            pc._streams.append(_text_line(y, item['product__sku'],         10, 270))
-            pc._streams.append(_text_line(y, str(item['total_qty']),       10, 360))
-            pc._streams.append(_text_line(y, f"{item['total_sales']:.2f}", 10, 450))
+            pc._streams.append(_text_line(y, item['product__name'],                 10,  72))
+            pc._streams.append(_text_line(y, item.get('product__sku') or '—',       10, 270))
+            pc._streams.append(_text_line(y, str(item['total_qty']),                10, 360))
+            pc._streams.append(_text_line(y, f"{item['total_sales']:.2f}",          10, 450))
 
             # Advance Y position for next row
             pc.skip(18)

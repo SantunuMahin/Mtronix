@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt #SALE-{{ sale.pk|stringformat:"05d" }} - Mtronix</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+            padding: 30px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── Toolbar ────────────────────────────────────────── */
+        .toolbar {
+            width: 100%;
+            max-width: 440px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+        }
+        .btn-primary {
+            background-color: #0f766e;
+            color: #ffffff;
+            box-shadow: 0 2px 4px rgba(15,118,110,0.2);
+        }
+        .btn-primary:hover {
+            background-color: #115e59;
+        }
+        .btn-secondary {
+            background-color: #ffffff;
+            color: #334155;
+            border-color: #cbd5e1;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .btn-secondary:hover {
+            background-color: #f8fafc;
+            border-color: #94a3b8;
+        }
+
+        /* ── Receipt Card ────────────────────────────────────── */
+        .receipt-card {
+            background: #ffffff;
+            width: 100%;
+            max-width: 440px;
+            padding: 32px 28px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
+            border: 1px solid #e2e8f0;
+            position: relative;
+        }
+
+        /* ── Header ─────────────────────────────────────────── */
+        .receipt-header {
+            text-align: center;
+            padding-bottom: 16px;
+            border-bottom: 1.5px dashed #cbd5e1;
+            margin-bottom: 16px;
+        }
+        .receipt-header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #0f172a;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+        }
+        .receipt-subtitle {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            color: #0f766e;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+        .receipt-header p {
+            font-size: 12px;
+            color: #475569;
+            line-height: 1.45;
+        }
+        .receipt-header .contact {
+            font-size: 11.5px;
+            font-weight: 500;
+            color: #334155;
+            margin-top: 4px;
+        }
+
+        /* ── Meta Details ────────────────────────────────────── */
+        .receipt-meta {
+            font-size: 12.5px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+            margin-bottom: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .meta-label {
+            color: #64748b;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        .meta-value {
+            font-weight: 600;
+            color: #0f172a;
+            font-family: 'Inter', sans-serif;
+        }
+        .meta-value.invoice-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: #0f766e;
+        }
+
+        /* ── Items Table ─────────────────────────────────────── */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+        .items-table th {
+            text-align: left;
+            font-weight: 700;
+            color: #475569;
+            border-bottom: 1.5px solid #0f172a;
+            padding: 8px 0;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+        .items-table th.num, .items-table td.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .items-table td {
+            padding: 9px 0;
+            border-bottom: 1px dashed #e2e8f0;
+            vertical-align: top;
+            color: #1e293b;
+        }
+        .item-name {
+            font-weight: 600;
+            color: #0f172a;
+            display: block;
+            line-height: 1.35;
+        }
+        .item-tags {
+            display: flex;
+            gap: 6px;
+            margin-top: 2px;
+            flex-wrap: wrap;
+        }
+        .item-sku {
+            font-size: 11px;
+            color: #64748b;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .item-group {
+            font-size: 10px;
+            color: #0284c7;
+            background: #f0f9ff;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        /* ── Totals ──────────────────────────────────────────── */
+        .totals-section {
+            border-top: 2px dashed #0f172a;
+            border-bottom: 1.5px dashed #cbd5e1;
+            padding: 14px 0;
+            margin-bottom: 16px;
+        }
+        .total-summary-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.2px;
+        }
+        .total-row .amount {
+            color: #0f766e;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+        }
+
+        /* ── Store Greeting ─────────────────────────────────── */
+        .receipt-footer {
+            text-align: center;
+            padding: 4px 0 14px;
+        }
+        .receipt-footer .greeting {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 3px;
+        }
+        .receipt-footer .tagline {
+            font-size: 11.5px;
+            color: #64748b;
+        }
+
+        /* ── Store QR Code ───────────────────────────────────── */
+        .receipt-qr {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            margin: 6px 0 16px;
+            text-align: center;
+        }
+        .receipt-qr img {
+            width: 56px;
+            height: 56px;
+            display: block;
+            margin: 0 auto 5px;
+            image-rendering: pixelated;
+        }
+        .receipt-qr span {
+            font-size: 10.5px;
+            color: #475569;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        /* ── Provider Info Box ───────────────────────────────── */
+        .provider-info {
+            text-align: center;
+            padding-top: 10px;
+            border-top: 1px solid #f1f5f9;
+            font-size: 10px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+        .provider-info strong {
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        /* ── Print Media Optimization ────────────────────────── */
+        @media print {
+            body {
+                background: #ffffff !important;
+                padding: 0 !important;
+                color: #000000 !important;
+            }
+            .toolbar {
+                display: none !important;
+            }
+            .receipt-card {
+                max-width: 100% !important;
+                width: 100% !important;
+                box-shadow: none !important;
+                border: none !important;
+                padding: 4px 6px !important;
+                border-radius: 0 !important;
+            }
+            .receipt-header h1 {
+                color: #000 !important;
+            }
+            .receipt-subtitle {
+                color: #000 !important;
+            }
+            .total-row .amount {
+                color: #000 !important;
+            }
+            .receipt-qr {
+                background: transparent !important;
+                border-color: #000 !important;
+            }
+            @page {
+                margin: 4mm 4mm;
+                size: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <a href="{% url 'sales:list' %}" class="btn btn-secondary">← Back to Sales</a>
+        <div style="display: flex; gap: 8px;">
+            <a href="{% url 'sales:receipt_pdf' sale.pk %}" class="btn btn-secondary" target="_blank">PDF Copy</a>
+            <button onclick="window.print()" class="btn btn-primary">🖨️ Print Direct</button>
+        </div>
+    </div>
+
+    <div class="receipt-card">
+        <!-- Brand Header -->
+        <div class="receipt-header">
+            <h1>MTRONIX</h1>
+            <span class="receipt-subtitle">Electronics & Parts</span>
+            <p>Ibrahim Electric & Electronics Market</p>
+            <p>124 BCC Road, Dhaka, Bangladesh</p>
+            <p class="contact">Phone: 01706-970195 &bull; mannanelectronics111@gmail.com</p>
+        </div>
+
+        <!-- Receipt Meta -->
+        <div class="receipt-meta">
+            <div class="meta-row">
+                <span class="meta-label">Receipt No</span>
+                <span class="meta-value invoice-id">SALE-{{ sale.pk|stringformat:"05d" }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Date & Time</span>
+                <span class="meta-value">{{ sale.sold_at|date:"d M Y, h:i A" }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Customer</span>
+                <span class="meta-value">{{ sale.customer_name|default:"Walk-in Customer" }}</span>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item Description</th>
+                    <th class="num">Qty</th>
+                    <th class="num">Price</th>
+                    <th class="num">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in sale.items.all %}
+                <tr>
+                    <td>
+                        <span class="item-name">{{ item.product.name }}</span>
+                        <div class="item-tags">
+                            {% if item.product.group %}
+                            <span class="item-group">{{ item.product.group.name }}</span>
+                            {% endif %}
+                            {% if item.product.sku %}
+                            <span class="item-sku">SKU: {{ item.product.sku }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="num">{{ item.quantity }}</td>
+                    <td class="num">BDT {{ item.unit_price|floatformat:2 }}</td>
+                    <td class="num">BDT {{ item.total_amount|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Totals -->
+        <div class="totals-section">
+            <div class="total-summary-row">
+                <span>Total Items: {{ sale.items.count }}</span>
+                <span>Payment: Cash</span>
+            </div>
+            <div class="total-row">
+                <span>TOTAL AMOUNT:</span>
+                <span class="amount">BDT {{ sale.total_amount|floatformat:2 }}</span>
+            </div>
+        </div>
+
+        <!-- Store Greeting -->
+        <div class="receipt-footer">
+            <p class="greeting">Thank you for your purchase!</p>
+            <p class="tagline">Mtronix &mdash; Your trusted electronics partner</p>
+        </div>
+
+        <!-- QR Code -->
+        {% if qr_code_b64 %}
+        <div class="receipt-qr">
+            <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR">
+            <span>Scan for Store Location & Directions</span>
+        </div>
+        {% endif %}
+
+        <!-- Provider Info -->
+        <div class="provider-info">
+            <p>This is a computer-generated receipt.</p>
+            <p>Software Provider: <strong>Intlisoft Innovation</strong> &bull; Ph: 01888-735883</p>
+            <p>info.intlisoftinnovation@gmail.com</p>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                window.print();
+            }, 350);
+        });
+    </script>
+</body>
+</html>

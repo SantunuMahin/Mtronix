@@ -8,6 +8,9 @@
 <section class="panel form-panel">
     <form method="post" novalidate>
         {% include 'includes/form.html' %}
+        <p style="margin: 8px 0 16px; font-size: 13px; color: var(--muted);">
+            Need a new category/group? <a href="{% url 'products:group_create' %}" target="_blank" style="color: var(--primary); font-weight: 600;">+ Create New Product Group</a>
+        </p>
         <div class="form-actions">
             <a class="button" href="{% url 'products:list' %}">Cancel</a>
             <button class="button primary" type="submit">Save Product</button>

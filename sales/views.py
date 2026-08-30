@@ -7,15 +7,34 @@ from django.urls import reverse
 from django.utils import timezone
 from django.forms import inlineformset_factory
 from rest_framework import mixins, viewsets
+import base64
+import io
 import pytz
 
 from inventory.services import InventoryService
 from sales.forms import SaleForm, SaleItemForm
 from sales.models import Sale, SaleItem
-from sales.pdf import build_sale_receipt_pdf, build_sales_report_pdf
+from sales.pdf import MAPS_URL, build_sale_receipt_pdf, build_sales_report_pdf, qrcode
 from sales.serializers import SaleSerializer
 
 BD_TZ = pytz.timezone('Asia/Dhaka')
+
+
+def _generate_qr_base64(data: str) -> str:
+    if qrcode is None:
+        return ''
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=2,
+        border=1,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode('ascii')
 
 
 class SaleViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -39,13 +58,14 @@ SaleItemFormSet = inlineformset_factory(
 def _build_products_catalog():
     """Build product catalog with inventory data for the frontend."""
     from products.models import Product
-    products = Product.objects.select_related('inventory').order_by('name')
+    products = Product.objects.select_related('inventory', 'group').order_by('name')
     products_catalog = []
     for product in products:
         stock = product.inventory.quantity if hasattr(product, 'inventory') else 0
         products_catalog.append({
             'id': product.id,
             'name': product.name,
+            'group': product.group.name if product.group else '',
             'sku': product.sku,
             'price': str(product.selling_price),
             'stock': stock,
@@ -98,11 +118,21 @@ def _serialize_product_sales_data(items):
 
 # ─── Views ──────────────────────────────────────────────────
 
+import re
+
 def sale_list(request):
-    query = request.GET.get('q', '')
+    query = request.GET.get('q', '').strip()
     sales = Sale.objects.prefetch_related('items__product').order_by('-sold_at')
     if query:
-        sales = sales.filter(customer_name__icontains=query)
+        q_filter = models.Q(customer_name__icontains=query) | models.Q(items__product__name__icontains=query)
+        clean_digits = re.sub(r'[^\d]', '', query)
+        if clean_digits:
+            try:
+                sale_id = int(clean_digits)
+                q_filter |= models.Q(pk=sale_id)
+            except ValueError:
+                pass
+        sales = sales.filter(q_filter).distinct()
 
     receipt_sale = None
     receipt_pk = request.GET.get('receipt')
@@ -143,6 +173,18 @@ def sale_create(request):
         'formset': formset,
         'title': 'New Sale',
         'products_catalog': _build_products_catalog(),
+    })
+
+
+def sale_receipt_print(request, pk):
+    sale = get_object_or_404(
+        Sale.objects.prefetch_related('items__product'),
+        pk=pk
+    )
+    qr_code_b64 = _generate_qr_base64(MAPS_URL)
+    return render(request, 'sales/receipt.html', {
+        'sale': sale,
+        'qr_code_b64': qr_code_b64,
     })
 
 

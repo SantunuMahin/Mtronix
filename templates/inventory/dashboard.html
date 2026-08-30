@@ -38,7 +38,7 @@
                 {% for item in current_inventory %}
                 <tr>
                     <td>{{ item.product.name }}</td>
-                    <td>{{ item.product.sku }}</td>
+                    <td>{{ item.product.sku|default:"—" }}</td>
                     <td><span class="badge">{{ item.quantity }}</span></td>
                     <td>{{ item.product.low_stock_threshold }}</td>
                 </tr>

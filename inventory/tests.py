@@ -102,6 +102,24 @@ class InventoryPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Inventory')
 
+    def test_inventory_stock_report_pdf_renders(self):
+        response = self.client.get('/inventory/report/pdf/?type=stock')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(len(response.content) > 0)
+
+    def test_inventory_new_products_report_pdf_renders(self):
+        response = self.client.get('/inventory/report/pdf/?type=new_products&period=today')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(len(response.content) > 0)
+
+    def test_inventory_updated_stock_report_pdf_renders(self):
+        response = self.client.get('/inventory/report/pdf/?type=updated_stock&period=today')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(len(response.content) > 0)
+
 
 class StockMovementSerializerTests(TestCase):
     def setUp(self):

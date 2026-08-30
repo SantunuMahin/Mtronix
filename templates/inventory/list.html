@@ -2,10 +2,30 @@
 
 {% block title %}Inventory - Mtronix{% endblock %}
 {% block page_title %}Inventory{% endblock %}
-{% block page_subtitle %}Monitor stock levels and adjust inventory when needed.{% endblock %}
+{% block page_subtitle %}Monitor stock levels, print inventory reports, and adjust stock.{% endblock %}
+
+{% block header_action %}
+<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="button primary" href="{% url 'inventory:report_pdf' %}?type=stock" target="_blank" title="Print complete stock inventory">🖨️ Print Stock Summary</a>
+</div>
+{% endblock %}
 
 {% block content %}
 <section class="panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span style="color: var(--muted); font-size: 14px; font-weight: bold;">Print Reports:</span>
+            <a class="button" href="{% url 'inventory:report_pdf' %}?type=new_products&period=today" target="_blank" title="Print products added today">📄 Today's New Products</a>
+            <a class="button" href="{% url 'inventory:report_pdf' %}?type=updated_stock&period=today" target="_blank" title="Print products with stock updated today">📊 Today's Stock Updates</a>
+            <a class="button" href="{% url 'inventory:report_pdf' %}?type=stock" target="_blank" title="Print all active stock">📦 All Stock PDF</a>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            <span style="color: var(--muted); font-size: 13px;">Period:</span>
+            <a class="button" href="{% url 'inventory:report_pdf' %}?type=new_products&period=month" target="_blank" style="padding: 6px 10px; font-size: 12px;">This Month's New</a>
+            <a class="button" href="{% url 'inventory:report_pdf' %}?type=updated_stock&period=month" target="_blank" style="padding: 6px 10px; font-size: 12px;">This Month's Updates</a>
+        </div>
+    </div>
+
     <div class="table-wrap">
         <table>
             <thead>
@@ -15,7 +35,7 @@
                 {% for item in inventory %}
                 <tr>
                     <td>{{ item.product.name }}</td>
-                    <td>{{ item.product.sku }}</td>
+                    <td>{{ item.product.sku|default:"—" }}</td>
                     <td><span class="badge">{{ item.quantity }}</span></td>
                     <td>{{ item.product.low_stock_threshold }}</td>
                     <td>{{ item.updated_at|date:"M d, Y h:i A" }}</td>

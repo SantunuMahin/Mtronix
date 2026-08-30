@@ -22,8 +22,11 @@
             <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
                 <span class="nav-icon">⊞</span> Dashboard
             </a>
-            <a href="{% url 'products:list' %}" class="{% if 'products' in request.path %}active{% endif %}">
+            <a href="{% url 'products:list' %}" class="{% if 'products' in request.path and 'groups' not in request.path %}active{% endif %}">
                 <span class="nav-icon">📦</span> Products
+            </a>
+            <a href="{% url 'products:group_list' %}" class="{% if 'groups' in request.path %}active{% endif %}">
+                <span class="nav-icon">📁</span> Product Groups
             </a>
             <a href="{% url 'inventory:list' %}" class="{% if 'inventory' in request.path %}active{% endif %}">
                 <span class="nav-icon">🗄</span> Inventory

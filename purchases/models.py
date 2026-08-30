@@ -17,4 +17,4 @@ class Purchase(models.Model):
         return self.quantity * self.unit_price
 
     def __str__(self):
-        return f'Purchase {self.product.sku} x {self.quantity}'
+        return f'Purchase {self.product.name} x {self.quantity}'

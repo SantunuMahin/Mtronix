@@ -49,4 +49,4 @@ class SaleItem(models.Model):
         return self.quantity * self.unit_price
 
     def __str__(self):
-        return f'{self.product.sku} x {self.quantity} in Sale #{self.sale.pk}'
+        return f'{self.product.name} x {self.quantity} in Sale #{self.sale.pk}'
