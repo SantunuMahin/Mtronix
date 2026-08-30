@@ -48,7 +48,10 @@
                     <td>BDT {{ product.purchase_price }}</td>
                     <td>BDT {{ product.selling_price }}</td>
                     <td><span class="badge">{{ product.total_stock }}</span></td>
-                    <td><a class="button" href="{% url 'products:update' product.pk %}">Edit</a></td>
+                    <td class="actions" style="white-space: nowrap;">
+                        <a class="button" href="{% url 'products:update' product.pk %}">Edit</a>
+                        <a class="button" href="{% url 'products:delete' product.pk %}" style="color: #dc2626;">Delete</a>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="7" style="text-align: center; padding: 24px;">No products found in this category.</td></tr>

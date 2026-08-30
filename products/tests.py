@@ -144,3 +144,9 @@ class ProductPageTests(TestCase):
         res_delete = self.client.post(f'/products/groups/{grp.pk}/delete/')
         self.assertEqual(res_delete.status_code, 302)
         self.assertFalse(ProductGroup.objects.filter(pk=grp.pk).exists())
+
+    def test_product_delete_view(self):
+        p = Product.objects.create(name='Obsolete Item', purchase_price='1.00', selling_price='2.00')
+        res = self.client.post(f'/products/{p.pk}/delete/')
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(Product.objects.filter(pk=p.pk).exists())

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Product - Mtronix{% endblock %}
+{% block page_title %}Delete Product{% endblock %}
+{% block page_subtitle %}Confirm product deletion from catalog.{% endblock %}
+
+{% block content %}
+<section class="panel form-panel">
+    <form method="post">
+        {% csrf_token %}
+        <p style="margin-bottom: 16px; font-size: 15px;">
+            Are you sure you want to delete product <strong>"{{ product.name }}"</strong>{% if product.sku %} (SKU: {{ product.sku }}){% endif %}?
+        </p>
+        <div class="form-actions">
+            <a class="button" href="{% url 'products:list' %}">Cancel</a>
+            <button class="button primary" type="submit" style="background: #dc2626; border-color: #dc2626;">Yes, Delete Product</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

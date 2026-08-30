@@ -56,7 +56,18 @@ def product_update(request, pk):
         messages.success(request, 'Product updated successfully.')
         return redirect('products:list')
 
-    return render(request, 'products/form.html', {'form': form, 'title': 'Edit Product'})
+    return render(request, 'products/form.html', {'form': form, 'title': 'Edit Product', 'product': product})
+
+
+def product_delete(request, pk):
+    product = get_object_or_404(Product, pk=pk)
+    if request.method == 'POST':
+        name = product.name
+        product.delete()
+        messages.success(request, f'Product "{name}" deleted successfully.')
+        return redirect('products:list')
+
+    return render(request, 'products/confirm_delete.html', {'product': product})
 
 
 # ── Product Group Views ───────────────────────────────────────────────────────
