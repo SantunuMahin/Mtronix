@@ -315,6 +315,46 @@
 /* customer panel */
 .se-customer-panel { padding: 18px 20px; margin-bottom: 16px; }
 .se-customer-panel .field { margin: 0; }
+.se-cust-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+@media (max-width: 640px) {
+    .se-cust-grid { grid-template-columns: 1fr; }
+}
+.se-cust-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.se-cust-field label {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text);
+}
+.se-cust-field input, .se-cust-field select {
+    width: 100%;
+    box-sizing: border-box;
+    height: 40px;
+    font-size: 13.5px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    font-family: inherit;
+    transition: border-color .15s, box-shadow .15s;
+}
+.se-cust-field input:focus, .se-cust-field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+}
+.payment-status-select {
+    font-weight: 600;
+}
 
 /* items panel */
 .se-items-panel { padding: 18px 20px; }
@@ -358,12 +398,53 @@
 
                 <!-- Customer + quick search -->
                 <div class="panel se-customer-panel">
-                    <div class="field" style="margin-bottom: 14px;">
-                        <span style="font-size: 13px;">Customer name <span style="color: var(--muted); font-weight: 400;">(optional)</span></span>
-                        {{ form.customer_name }}
-                        {% for error in form.customer_name.errors %}
-                            <strong style="color: #991b1b; font-size: 12px; display: block; margin-top: 4px;">{{ error }}</strong>
-                        {% endfor %}
+                    <div class="se-cust-grid">
+                        <div class="se-cust-field">
+                            <label>Customer Name <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
+                            {{ form.customer_name }}
+                            {% for error in form.customer_name.errors %}
+                                <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
+                            {% endfor %}
+                        </div>
+
+                        <div class="se-cust-field">
+                            <label>Phone Number <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
+                            {{ form.customer_phone }}
+                            {% for error in form.customer_phone.errors %}
+                                <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
+                            {% endfor %}
+                        </div>
+
+                        <div class="se-cust-field">
+                            <label>Address / Area <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
+                            {{ form.customer_address }}
+                            {% for error in form.customer_address.errors %}
+                                <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
+                            {% endfor %}
+                        </div>
+
+                        <div class="se-cust-field">
+                            <label>Payment Status</label>
+                            {{ form.payment_status }}
+                            {% for error in form.payment_status.errors %}
+                                <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
+                            {% endfor %}
+                        </div>
+
+                        <div class="se-cust-field" id="paid-amount-field" style="display: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                <label for="id_paid_amount">Paid Amount (BDT) <span style="color: #0f766e; font-weight: 700;">*</span></label>
+                                <div style="display: flex; gap: 4px;">
+                                    <button type="button" id="btn-half-pay" style="padding: 1px 7px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; cursor: pointer; font-weight: 600; color: #0f766e;">🌓 50% (Half)</button>
+                                    <button type="button" id="btn-full-pay" style="padding: 1px 7px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; cursor: pointer; font-weight: 600; color: #334155;">100%</button>
+                                </div>
+                            </div>
+                            {{ form.paid_amount }}
+                            <small id="due-amount-preview" style="font-size: 11.5px; color: #991b1b; font-weight: 600; margin-top: 3px; display: block;">Due Balance: BDT 0.00</small>
+                            {% for error in form.paid_amount.errors %}
+                                <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
+                            {% endfor %}
+                        </div>
                     </div>
 
                     <div>
@@ -385,7 +466,10 @@
                             <h2>Sale items</h2>
                             <span id="item-count" style="font-size: 12px; color: var(--muted);">0 items</span>
                         </div>
-                        <button type="button" class="button" id="add-item-btn">+ Empty row</button>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="button" id="add-custom-btn" style="background: #fffbeb; border-color: #fde68a; color: #92400e; font-weight: 600; font-size: 12.5px;">✨ + Custom / Unknown Item</button>
+                            <button type="button" class="button" id="add-item-btn">+ Empty row</button>
+                        </div>
                     </div>
 
                     <div class="se-stock-alert" id="stock-alert">
@@ -407,16 +491,19 @@
 
                             <div class="se-product-wrap" id="pwrap-{{ forloop.counter0 }}">
                                 <input class="product-search-input" type="search" autocomplete="off"
-                                    placeholder="Search product…"
+                                    placeholder="Search product or type custom item name…"
                                     data-index="{{ forloop.counter0 }}"
                                     aria-label="Search product">
                                 <div class="se-dropdown product-dropdown" id="pdrop-{{ forloop.counter0 }}" hidden></div>
                             </div>
 
-                            <div style="display: none;">{{ item_form.product }}</div>
-                            <small class="se-stock-hint" id="hint-{{ forloop.counter0 }}">Select a product to see stock.</small>
+                            <div style="display: none;">{{ item_form.product }}{{ item_form.custom_name }}</div>
+                            <small class="se-stock-hint" id="hint-{{ forloop.counter0 }}">Select a product or enter a custom item.</small>
 
                             {% for error in item_form.product.errors %}
+                                <strong style="color: #991b1b; font-size: 12px; display: block; margin-top: 4px;">{{ error }}</strong>
+                            {% endfor %}
+                            {% for error in item_form.custom_name.errors %}
                                 <strong style="color: #991b1b; font-size: 12px; display: block; margin-top: 4px;">{{ error }}</strong>
                             {% endfor %}
 
@@ -462,6 +549,14 @@
                         <span>Grand total</span>
                         <strong id="grand-total">BDT 0.00</strong>
                     </div>
+                    <div class="se-summary-row" id="sidebar-paid-row" style="color: #065f46; display: none;">
+                        <span>Paid amount</span>
+                        <strong id="sidebar-paid-amount">BDT 0.00</strong>
+                    </div>
+                    <div class="se-summary-row" id="sidebar-due-row" style="color: #991b1b; display: none;">
+                        <span>Balance due</span>
+                        <strong id="sidebar-due-amount">BDT 0.00</strong>
+                    </div>
                     <div class="se-summary-actions">
                         <button class="button primary" type="submit">Save sale</button>
                         <a class="button" href="{% url 'sales:list' %}">Cancel</a>
@@ -485,14 +580,14 @@
 
         <div class="se-product-wrap" id="pwrap-__prefix__">
             <input class="product-search-input" type="search" autocomplete="off"
-                placeholder="Search product…"
+                placeholder="Search product or type custom item name…"
                 data-index="__prefix__"
                 aria-label="Search product">
             <div class="se-dropdown product-dropdown" id="pdrop-__prefix__" hidden></div>
         </div>
 
-        <div style="display: none;">{{ formset.empty_form.product }}</div>
-        <small class="se-stock-hint" id="hint-__prefix__">Select a product to see stock.</small>
+        <div style="display: none;">{{ formset.empty_form.product }}{{ formset.empty_form.custom_name }}</div>
+        <small class="se-stock-hint" id="hint-__prefix__">Select a product or enter a custom item.</small>
 
         <div class="se-fields" style="margin-top: 12px;">
             <div class="se-field">
@@ -520,7 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const catalog = JSON.parse(document.getElementById('products-catalog-data').textContent || '[]');
     const byId    = new Map(catalog.map(p => [String(p.id), p]));
 
-    // Track selected product id per row: { rowIndex -> productId }
+    // Track selected item per row: { rowIndex -> { type: 'product'|'custom', id?, name, product? } }
     const selectedMap = {};
 
     // ── Utilities ───────────────────────────────────────────────────────────
@@ -540,12 +635,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Dropdown builder ────────────────────────────────────────────────────
-    function buildDropdown(results, onPick) {
+    function buildDropdown(results, query, onPickProduct, onPickCustom) {
         const dd = document.createElement('div');
-        if (!results.length) {
-            dd.innerHTML = `<div class="se-dropdown-empty">No matching products</div>`;
+        const q = (query || '').trim();
+
+        if (!results.length && !q) {
+            dd.innerHTML = `<div class="se-dropdown-empty">Type product name or SKU to search…</div>`;
             return dd;
         }
+
         results.forEach((p, i) => {
             const oos = (p.stock ?? 0) === 0;
             const [cls, label] = stockClass(p);
@@ -556,34 +654,61 @@ document.addEventListener('DOMContentLoaded', () => {
             const groupBadge = p.group ? `<span class="se-dr-group" style="font-size: 10px; color: #2563eb; background: #eff6ff; padding: 1px 5px; border-radius: 4px; font-weight: 500; margin-left: 6px;">${esc(p.group)}</span>` : '';
             div.innerHTML = `
                 <div class="se-dr-left">
-                    <span class="se-dr-name">${esc(p.name)}${groupBadge}</span>
+                    <span class="se-dr-name">📦 ${esc(p.name)}${groupBadge}</span>
                     <span class="se-dr-sku">${esc(p.sku || '')}</span>
                 </div>
                 <div class="se-dr-right">
                     <span class="se-dr-price">${money(p.price)}</span>
                     <span class="se-dr-stock ${cls}">${label}</span>
                 </div>`;
-            if (!oos) div.addEventListener('mousedown', e => { e.preventDefault(); onPick(p); });
+            if (!oos) div.addEventListener('mousedown', e => { e.preventDefault(); onPickProduct(p); });
             dd.appendChild(div);
         });
+
+        // Always allow adding the query as an ad-hoc / custom product
+        if (q) {
+            const customDiv = document.createElement('div');
+            customDiv.className = 'se-dropdown-result' + (!results.length ? ' se-highlighted' : '');
+            customDiv.setAttribute('role', 'option');
+            customDiv.style.background = '#fffbeb';
+            customDiv.style.borderTop = results.length ? '1px dashed #fde68a' : 'none';
+            customDiv.innerHTML = `
+                <div class="se-dr-left">
+                    <span class="se-dr-name" style="color: #92400e; font-weight: 700;">✨ Add Custom / Unknown Item: "${esc(q)}"</span>
+                    <span class="se-dr-sku" style="color: #b45309;">Ad-hoc item &bull; No catalog registration needed</span>
+                </div>
+                <div class="se-dr-right">
+                    <span style="font-size: 11px; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Custom Item</span>
+                </div>`;
+            customDiv.addEventListener('mousedown', e => { e.preventDefault(); onPickCustom(q); });
+            dd.appendChild(customDiv);
+        }
+
         return dd;
     }
 
-    function showDropdown(container, results, onPick) {
+    function showDropdown(container, results, query, onPickProduct, onPickCustom) {
         container.innerHTML = '';
-        container.appendChild(buildDropdown(results, onPick));
+        container.appendChild(buildDropdown(results, query, onPickProduct, onPickCustom));
         container.hidden = false;
     }
 
     function hideDropdown(dd) { if (dd) dd.hidden = true; }
 
-    function handleArrowKeys(e, dd, onEnter) {
+    function handleArrowKeys(e, dd, onEnterProduct, onEnterCustom) {
         const items = [...dd.querySelectorAll('.se-dropdown-result:not(.se-oos)')];
         if (!items.length) return;
         let idx = items.findIndex(i => i.classList.contains('se-highlighted'));
         if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); }
-        else if (e.key === 'Enter')  { e.preventDefault(); if (items[idx]) onEnter(items[idx].dataset.pid); return; }
+        else if (e.key === 'Enter')  {
+            e.preventDefault();
+            if (items[idx]) {
+                if (items[idx].dataset.pid) onEnterProduct(items[idx].dataset.pid);
+                else onEnterCustom();
+            }
+            return;
+        }
         else if (e.key === 'Escape') { hideDropdown(dd); return; }
         else return;
         items.forEach(i => i.classList.remove('se-highlighted'));
@@ -596,11 +721,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function selectProductForRow(index, product) {
         const row = getRow(index);
         if (!row) return;
-        selectedMap[index] = String(product.id);
+        selectedMap[index] = { type: 'product', id: String(product.id), name: product.name };
 
-        // Hidden select
+        // Hidden select & clear custom_name
         const hiddenSel = row.querySelector('select[name$="-product"]');
         if (hiddenSel) hiddenSel.value = String(product.id);
+        const customInp = row.querySelector('input[name$="-custom_name"]');
+        if (customInp) customInp.value = '';
 
         // Price
         const priceInp = row.querySelector('input[name$="-unit_price"]');
@@ -635,12 +762,57 @@ document.addEventListener('DOMContentLoaded', () => {
         calculateTotals();
     }
 
+    function selectCustomItemForRow(index, customName) {
+        const row = getRow(index);
+        if (!row) return;
+        const name = (customName || '').trim();
+        if (!name) return;
+        selectedMap[index] = { type: 'custom', name: name };
+
+        // Clear product select & set custom_name input
+        const hiddenSel = row.querySelector('select[name$="-product"]');
+        if (hiddenSel) hiddenSel.value = '';
+        const customInp = row.querySelector('input[name$="-custom_name"]');
+        if (customInp) customInp.value = name;
+
+        // Default qty
+        const qtyInp = row.querySelector('input[name$="-quantity"]');
+        if (qtyInp && (!qtyInp.value || parseFloat(qtyInp.value) <= 0)) qtyInp.value = '1';
+
+        // Show chip, hide search
+        const chip    = document.getElementById(`chip-${index}`);
+        const pwrap   = document.getElementById(`pwrap-${index}`);
+        const pdrop   = document.getElementById(`pdrop-${index}`);
+        if (chip) {
+            chip.innerHTML = `
+                <span class="se-chip-name" style="color: #92400e;">✨ ${esc(name)}</span>
+                <span class="se-chip-group" style="background: #fef3c7; color: #92400e;">Custom / Unknown</span>
+                <span class="se-chip-stock stock-ok" style="background: #f1f5f9; color: #475569;">No stock limit</span>
+                <button class="se-chip-clear" type="button" aria-label="Change item" data-index="${index}">✕ Change</button>`;
+            chip.style.display = 'inline-flex';
+            chip.querySelector('.se-chip-clear').addEventListener('click', () => clearProductForRow(index));
+        }
+        if (pwrap) { pwrap.style.display = 'none'; }
+        hideDropdown(pdrop);
+
+        updateStockHint(index);
+        calculateTotals();
+
+        const priceInp = row.querySelector('input[name$="-unit_price"]');
+        if (priceInp) {
+            priceInp.focus();
+            priceInp.select();
+        }
+    }
+
     function clearProductForRow(index) {
         delete selectedMap[index];
         const row = getRow(index);
         if (!row) return;
         const hiddenSel = row.querySelector('select[name$="-product"]');
         if (hiddenSel) hiddenSel.value = '';
+        const customInp = row.querySelector('input[name$="-custom_name"]');
+        if (customInp) customInp.value = '';
         const priceInp = row.querySelector('input[name$="-unit_price"]');
         if (priceInp) priceInp.value = '';
         const qtyInp = row.querySelector('input[name$="-quantity"]');
@@ -656,24 +828,62 @@ document.addEventListener('DOMContentLoaded', () => {
         if (searchI) { searchI.value = ''; searchI.focus(); }
         updateStockHint(index);
         calculateTotals();
-        // re-open dropdown
+
         const pdrop = document.getElementById(`pdrop-${index}`);
-        showDropdown(pdrop, catalog.slice(0, 10), p => selectProductForRow(index, p));
+        showDropdown(pdrop, catalog.slice(0, 10), '', p => selectProductForRow(index, p), q => selectCustomItemForRow(index, q));
     }
 
     // ── Stock hint ──────────────────────────────────────────────────────────
     function updateStockHint(index) {
         const hint = document.getElementById(`hint-${index}`);
         if (!hint) return;
-        const pid = selectedMap[index];
-        const product = pid ? byId.get(pid) : null;
+        const itemInfo = selectedMap[index];
+        if (!itemInfo) {
+            hint.textContent = 'Select a product or enter a custom item.';
+            hint.className = 'se-stock-hint';
+            return;
+        }
+        if (itemInfo.type === 'custom') {
+            hint.textContent = 'Custom item / unlisted product (No inventory tracking required).';
+            hint.className = 'se-stock-hint';
+            return;
+        }
+        const product = byId.get(itemInfo.id);
         if (!product) { hint.textContent = 'Select a product to view stock and pricing.'; hint.className = 'se-stock-hint'; return; }
         const [cls, label] = stockClass(product);
         hint.textContent = `Stock level: ${label}`;
         hint.className   = 'se-stock-hint' + (cls === 'stock-out' ? ' danger' : '');
     }
 
-    // ── Totals + alerts ─────────────────────────────────────────────────────
+    // ── Totals + Payment Alerts ─────────────────────────────────────────────
+    const payStatusSel = document.getElementById('id_payment_status');
+    const paidFieldWrap= document.getElementById('paid-amount-field');
+    const paidInput    = document.getElementById('id_paid_amount');
+    const duePreview   = document.getElementById('due-amount-preview');
+    const sidePaidRow  = document.getElementById('sidebar-paid-row');
+    const sideDueRow   = document.getElementById('sidebar-due-row');
+    const sidePaidAmt  = document.getElementById('sidebar-paid-amount');
+    const sideDueAmt   = document.getElementById('sidebar-due-amount');
+    const btnHalfPay   = document.getElementById('btn-half-pay');
+    const btnFullPay   = document.getElementById('btn-full-pay');
+
+    function syncPaymentUI() {
+        const st = payStatusSel ? payStatusSel.value : 'PAID';
+        if (st === 'PARTIAL') {
+            if (paidFieldWrap) paidFieldWrap.style.display = 'flex';
+            if (sidePaidRow) sidePaidRow.style.display = 'flex';
+            if (sideDueRow) sideDueRow.style.display = 'flex';
+        } else if (st === 'UNPAID') {
+            if (paidFieldWrap) paidFieldWrap.style.display = 'none';
+            if (sidePaidRow) sidePaidRow.style.display = 'none';
+            if (sideDueRow) sideDueRow.style.display = 'flex';
+        } else { // PAID
+            if (paidFieldWrap) paidFieldWrap.style.display = 'none';
+            if (sidePaidRow) sidePaidRow.style.display = 'none';
+            if (sideDueRow) sideDueRow.style.display = 'none';
+        }
+    }
+
     function calculateTotals() {
         let grand = 0, qty = 0, overstock = false, validItems = 0;
         document.querySelectorAll('.se-item-row').forEach(row => {
@@ -687,12 +897,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (totalEl) totalEl.textContent = money(sub);
             grand += sub; qty += q;
 
-            const pid = selectedMap[index];
-            if (pid) {
+            const itemInfo = selectedMap[index];
+            if (itemInfo) {
                 validItems++;
-                const prod = byId.get(pid);
-                const avail = prod?.stock ?? 0;
-                if (q > avail) overstock = true;
+                if (itemInfo.type === 'product') {
+                    const prod = byId.get(itemInfo.id);
+                    const avail = prod?.stock ?? 0;
+                    if (q > avail) overstock = true;
+                }
             }
         });
 
@@ -701,6 +913,70 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('total-lines').textContent  = validItems;
         document.getElementById('item-count').textContent   = validItems === 1 ? '1 item' : `${validItems} items`;
         document.getElementById('stock-alert').style.display = overstock ? 'block' : 'none';
+
+        // Payment status & partial calculations
+        const st = payStatusSel ? payStatusSel.value : 'PAID';
+        if (st === 'PARTIAL') {
+            let paidVal = parseFloat(paidInput?.value);
+            if (isNaN(paidVal) || paidVal < 0) paidVal = 0;
+            const dueVal = Math.max(0, grand - paidVal);
+            if (duePreview) duePreview.textContent = `Due Balance: ${money(dueVal)}`;
+            if (sidePaidAmt) sidePaidAmt.textContent = money(paidVal);
+            if (sideDueAmt) sideDueAmt.textContent = money(dueVal);
+        } else if (st === 'UNPAID') {
+            if (sidePaidAmt) sidePaidAmt.textContent = money(0);
+            if (sideDueAmt) sideDueAmt.textContent = money(grand);
+        } else {
+            if (sidePaidAmt) sidePaidAmt.textContent = money(grand);
+            if (sideDueAmt) sideDueAmt.textContent = money(0);
+        }
+    }
+
+    if (payStatusSel) {
+        payStatusSel.addEventListener('change', () => {
+            syncPaymentUI();
+            const st = payStatusSel.value;
+            let grand = 0;
+            document.querySelectorAll('.se-item-row').forEach(row => {
+                const q = parseFloat(row.querySelector('input[name$="-quantity"]')?.value) || 0;
+                const p = parseFloat(row.querySelector('input[name$="-unit_price"]')?.value) || 0;
+                grand += q * p;
+            });
+            if (st === 'PARTIAL' && paidInput && (!paidInput.value || parseFloat(paidInput.value) <= 0)) {
+                paidInput.value = (grand / 2).toFixed(2);
+            }
+            calculateTotals();
+        });
+    }
+
+    if (paidInput) {
+        paidInput.addEventListener('input', calculateTotals);
+    }
+
+    if (btnHalfPay) {
+        btnHalfPay.addEventListener('click', () => {
+            let grand = 0;
+            document.querySelectorAll('.se-item-row').forEach(row => {
+                const q = parseFloat(row.querySelector('input[name$="-quantity"]')?.value) || 0;
+                const p = parseFloat(row.querySelector('input[name$="-unit_price"]')?.value) || 0;
+                grand += q * p;
+            });
+            if (paidInput) paidInput.value = (grand / 2).toFixed(2);
+            calculateTotals();
+        });
+    }
+
+    if (btnFullPay) {
+        btnFullPay.addEventListener('click', () => {
+            let grand = 0;
+            document.querySelectorAll('.se-item-row').forEach(row => {
+                const q = parseFloat(row.querySelector('input[name$="-quantity"]')?.value) || 0;
+                const p = parseFloat(row.querySelector('input[name$="-unit_price"]')?.value) || 0;
+                grand += q * p;
+            });
+            if (paidInput) paidInput.value = grand.toFixed(2);
+            calculateTotals();
+        });
     }
 
     // ── Row listeners ───────────────────────────────────────────────────────
@@ -712,28 +988,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const priceInp= row.querySelector('input[name$="-unit_price"]');
         const removeB = row.querySelector('.remove-row-btn');
 
-        // Hide the Django select from tab order
+        // Hide the Django select & custom_name from tab order
         const hiddenSel = row.querySelector('select[name$="-product"]');
         if (hiddenSel) { hiddenSel.tabIndex = -1; hiddenSel.setAttribute('aria-hidden','true'); }
+        const customInp = row.querySelector('input[name$="-custom_name"]');
 
-        // If a product was pre-selected (edit page), restore chip
+        // If a product or custom name was pre-selected (edit page / resubmit), restore chip
         if (hiddenSel?.value) {
             const p = byId.get(hiddenSel.value);
             if (p) selectProductForRow(index, p);
+        } else if (customInp?.value) {
+            selectCustomItemForRow(index, customInp.value);
         }
 
         if (searchI) {
-            searchI.addEventListener('input', () => {
-                showDropdown(pdrop, matchProducts(searchI.value), p => selectProductForRow(index, p));
-            });
-            searchI.addEventListener('focus', () => {
-                showDropdown(pdrop, matchProducts(searchI.value), p => selectProductForRow(index, p));
-            });
+            const triggerDropdown = () => {
+                const q = searchI.value;
+                showDropdown(pdrop, matchProducts(q), q, 
+                    p => selectProductForRow(index, p),
+                    customText => selectCustomItemForRow(index, customText)
+                );
+            };
+
+            searchI.addEventListener('input', triggerDropdown);
+            searchI.addEventListener('focus', triggerDropdown);
             searchI.addEventListener('keydown', e => {
-                if (!pdrop.hidden) handleArrowKeys(e, pdrop, pid => {
-                    const p = byId.get(String(pid));
-                    if (p) selectProductForRow(index, p);
-                });
+                if (!pdrop.hidden) handleArrowKeys(e, pdrop, 
+                    pid => {
+                        const p = byId.get(String(pid));
+                        if (p) selectProductForRow(index, p);
+                    },
+                    () => {
+                        if (searchI.value.trim()) selectCustomItemForRow(index, searchI.value.trim());
+                    }
+                );
             });
         }
 
@@ -811,7 +1099,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function findEmptyRow() {
         return Array.from(document.querySelectorAll('.se-item-row')).find(row => {
             const s = row.querySelector('select[name$="-product"]');
-            return !s?.value;
+            const c = row.querySelector('input[name$="-custom_name"]');
+            return !s?.value && !c?.value;
         });
     }
 
@@ -827,47 +1116,86 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function addCustomItemLine(customName) {
+        const row = findEmptyRow() || addEmptyRow();
+        const index = row.dataset.index;
+        selectCustomItemForRow(index, customName);
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ── Custom Item Button ──────────────────────────────────────────────────
+    const addCustomBtn = document.getElementById('add-custom-btn');
+    if (addCustomBtn) {
+        addCustomBtn.addEventListener('click', () => {
+            const name = prompt('Enter custom / unknown product name or description:');
+            if (name && name.trim()) {
+                addCustomItemLine(name.trim());
+            }
+        });
+    }
+
     // ── Quick search bar ────────────────────────────────────────────────────
     const quickInput = document.getElementById('quick-search');
     const quickDrop  = document.getElementById('quick-dropdown');
     const quickBtn   = document.getElementById('quick-add-btn');
 
-    quickInput.addEventListener('input', () => {
-        showDropdown(quickDrop, matchProducts(quickInput.value), p => {
-            addProductLine(p);
-            quickInput.value = '';
-            hideDropdown(quickDrop);
-        });
-    });
-    quickInput.addEventListener('focus', () => {
-        showDropdown(quickDrop, matchProducts(quickInput.value), p => {
-            addProductLine(p);
-            quickInput.value = '';
-            hideDropdown(quickDrop);
-        });
-    });
+    const triggerQuickDropdown = () => {
+        const q = quickInput.value;
+        showDropdown(quickDrop, matchProducts(q), q, 
+            p => {
+                addProductLine(p);
+                quickInput.value = '';
+                hideDropdown(quickDrop);
+            },
+            customText => {
+                addCustomItemLine(customText);
+                quickInput.value = '';
+                hideDropdown(quickDrop);
+            }
+        );
+    };
+
+    quickInput.addEventListener('input', triggerQuickDropdown);
+    quickInput.addEventListener('focus', triggerQuickDropdown);
     quickInput.addEventListener('keydown', e => {
         if (!quickDrop.hidden) {
-            handleArrowKeys(e, quickDrop, pid => {
-                const p = byId.get(String(pid));
-                if (p) { addProductLine(p); quickInput.value = ''; hideDropdown(quickDrop); }
-            });
+            handleArrowKeys(e, quickDrop, 
+                pid => {
+                    const p = byId.get(String(pid));
+                    if (p) { addProductLine(p); quickInput.value = ''; hideDropdown(quickDrop); }
+                },
+                () => {
+                    if (quickInput.value.trim()) {
+                        addCustomItemLine(quickInput.value.trim());
+                        quickInput.value = '';
+                        hideDropdown(quickDrop);
+                    }
+                }
+            );
         }
         if (e.key === 'Enter' && quickDrop.hidden) {
-            const m = matchProducts(quickInput.value)[0];
-            if (m) { addProductLine(m); quickInput.value = ''; }
+            const q = quickInput.value.trim();
+            if (q) {
+                const m = matchProducts(q)[0];
+                if (m) addProductLine(m);
+                else addCustomItemLine(q);
+                quickInput.value = '';
+            }
         }
     });
+
     quickBtn.addEventListener('click', () => {
         const query = quickInput.value.trim();
         if (query) {
             const m = matchProducts(query)[0];
             if (m) {
                 addProductLine(m);
-                quickInput.value = '';
-                hideDropdown(quickDrop);
-                return;
+            } else {
+                addCustomItemLine(query);
             }
+            quickInput.value = '';
+            hideDropdown(quickDrop);
+            return;
         }
         // If quick input is empty, create an empty item form row
         const row = addEmptyRow();
@@ -904,9 +1232,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let over = false;
         document.querySelectorAll('.se-item-row').forEach(row => {
             const index = row.dataset.index;
-            const pid   = selectedMap[index];
-            if (!pid) return;
-            const prod  = byId.get(pid);
+            const itemInfo = selectedMap[index];
+            if (!itemInfo || itemInfo.type !== 'product') return;
+            const prod  = byId.get(itemInfo.id);
             const qty   = parseFloat(row.querySelector('input[name$="-quantity"]')?.value) || 0;
             const avail = prod?.stock ?? 0;
             if (qty > avail) over = true;
@@ -920,6 +1248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Init ────────────────────────────────────────────────────────────────
     document.querySelectorAll('.se-item-row').forEach(row => setupRowListeners(row));
     reindexRows();
+    syncPaymentUI();
     calculateTotals();
 });
 </script>

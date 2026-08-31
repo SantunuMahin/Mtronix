@@ -9,7 +9,7 @@ def rbac_flags(request):
         rbac_is_privileged  – True for SYSTEM_OWNER, sales role, or superuser.
                               These users can access every section including sales.
         rbac_can_access     – True for privileged users OR staff users (admin login).
-                              These users can access products/inventory/suppliers/purchases.
+                              These users can access products/inventory/sales.
     """
     if not request.user.is_authenticated:
         return {

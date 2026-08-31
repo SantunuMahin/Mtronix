@@ -126,3 +126,259 @@ class SalePageTests(TestCase):
         res3 = self.client.get('/sales/?q=Alice')
         self.assertContains(res3, 'Alice Smith')
         self.assertNotContains(res3, 'Bob Jones')
+
+    def test_sale_create_with_phone_address_and_payment_status(self):
+        InventoryService.add_stock(self.product, 5)
+        response = self.client.post(
+            '/sales/new/',
+            {
+                'customer_name': 'Rahim Uddin',
+                'customer_phone': '01711223344',
+                'customer_address': 'Dhanmondi, Dhaka',
+                'payment_status': 'UNPAID',
+                'items-TOTAL_FORMS': '1',
+                'items-INITIAL_FORMS': '0',
+                'items-MIN_NUM_FORMS': '1',
+                'items-MAX_NUM_FORMS': '1000',
+                'items-0-product': self.product.pk,
+                'items-0-quantity': 3,
+                'items-0-unit_price': '2.00',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        sale = Sale.objects.get(customer_name='Rahim Uddin')
+        self.assertEqual(sale.customer_phone, '01711223344')
+        self.assertEqual(sale.customer_address, 'Dhanmondi, Dhaka')
+        self.assertEqual(sale.payment_status, 'UNPAID')
+        self.assertFalse(sale.is_paid)
+        self.assertEqual(sale.total_amount, 6.00)
+
+    def test_sale_toggle_payment_status(self):
+        InventoryService.add_stock(self.product, 2)
+        sale = InventoryService.create_sale(
+            customer_name='Karim',
+            payment_status='UNPAID',
+            items=[{'product': self.product, 'quantity': 1, 'unit_price': '2.00'}],
+        )
+        self.assertEqual(sale.payment_status, 'UNPAID')
+
+        # Toggle to PAID
+        res = self.client.post(f'/sales/{sale.pk}/toggle-status/')
+        self.assertEqual(res.status_code, 302)
+        sale.refresh_from_db()
+        self.assertEqual(sale.payment_status, 'PAID')
+
+        # Toggle back to UNPAID
+        res2 = self.client.post(f'/sales/{sale.pk}/toggle-status/')
+        self.assertEqual(res2.status_code, 302)
+        sale.refresh_from_db()
+        self.assertEqual(sale.payment_status, 'UNPAID')
+
+    def test_sales_list_status_filtering(self):
+        InventoryService.add_stock(self.product, 10)
+        s_paid = InventoryService.create_sale(
+            customer_name='Paid Customer',
+            payment_status='PAID',
+            items=[{'product': self.product, 'quantity': 1, 'unit_price': '2.00'}],
+        )
+        s_unpaid = InventoryService.create_sale(
+            customer_name='Unpaid Customer',
+            payment_status='UNPAID',
+            items=[{'product': self.product, 'quantity': 2, 'unit_price': '2.00'}],
+        )
+
+        # Filter: paid
+        res_paid = self.client.get('/sales/?status=paid')
+        self.assertContains(res_paid, 'Paid Customer')
+        self.assertNotContains(res_paid, 'Unpaid Customer')
+
+        # Filter: unpaid
+        res_unpaid = self.client.get('/sales/?status=unpaid')
+        self.assertContains(res_unpaid, 'Unpaid Customer')
+        self.assertNotContains(res_unpaid, 'Paid Customer')
+
+    def test_customer_statement_html_view(self):
+        InventoryService.add_stock(self.product, 10)
+        InventoryService.create_sale(
+            customer_name='Sultana',
+            customer_phone='01800112233',
+            customer_address='Mirpur 10, Dhaka',
+            payment_status='UNPAID',
+            items=[{'product': self.product, 'quantity': 2, 'unit_price': '2.00'}],
+        )
+        response = self.client.get('/sales/statement/?customer=Sultana')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Sultana')
+        self.assertContains(response, '01800112233')
+        self.assertContains(response, 'Account Statement')
+
+    def test_customer_statement_pdf_generation(self):
+        InventoryService.add_stock(self.product, 10)
+        s1 = InventoryService.create_sale(
+            customer_name='Sultana',
+            customer_phone='01800112233',
+            customer_address='Mirpur 10, Dhaka',
+            payment_status='PAID',
+            items=[{'product': self.product, 'quantity': 1, 'unit_price': '2.00'}],
+        )
+        s2 = InventoryService.create_sale(
+            customer_name='Sultana',
+            customer_phone='01800112233',
+            customer_address='Mirpur 10, Dhaka',
+            payment_status='UNPAID',
+            items=[{'product': self.product, 'quantity': 3, 'unit_price': '2.00'}],
+        )
+
+        # Download all statement PDF for customer
+        response = self.client.get('/sales/statement/pdf/?customer=Sultana')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(len(response.content) > 0)
+
+        # Download selective statement PDF by IDs
+        res_selective = self.client.get(f'/sales/statement/pdf/?ids={s1.pk},{s2.pk}')
+        self.assertEqual(res_selective.status_code, 200)
+        self.assertEqual(res_selective['Content-Type'], 'application/pdf')
+        self.assertTrue(len(res_selective.content) > 0)
+
+    def test_sale_create_with_partial_half_payment(self):
+        InventoryService.add_stock(self.product, 10)
+        response = self.client.post(
+            '/sales/new/',
+            {
+                'customer_name': 'Hasan Ali',
+                'customer_phone': '01999887766',
+                'customer_address': 'Farmgate, Dhaka',
+                'payment_status': 'PARTIAL',
+                'paid_amount': '3.00',  # Out of 6.00 total (half payment)
+                'items-TOTAL_FORMS': '1',
+                'items-INITIAL_FORMS': '0',
+                'items-MIN_NUM_FORMS': '1',
+                'items-MAX_NUM_FORMS': '1000',
+                'items-0-product': self.product.pk,
+                'items-0-quantity': 3,
+                'items-0-unit_price': '2.00',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        sale = Sale.objects.get(customer_name='Hasan Ali')
+        self.assertEqual(sale.payment_status, 'PARTIAL')
+        self.assertTrue(sale.is_partial)
+        self.assertFalse(sale.is_paid)
+        self.assertFalse(sale.is_unpaid)
+        self.assertEqual(sale.total_amount, 6.00)
+        self.assertEqual(sale.effective_paid_amount, 3.00)
+        self.assertEqual(sale.due_amount, 3.00)
+
+        # Check receipt HTML displays partial payment & balance due
+        res_receipt = self.client.get(f'/sales/{sale.pk}/receipt/')
+        self.assertEqual(res_receipt.status_code, 200)
+        self.assertContains(res_receipt, 'PARTIAL PAYMENT')
+        self.assertContains(res_receipt, 'BALANCE DUE')
+        self.assertContains(res_receipt, '3.00')
+
+        # Check receipt PDF renders with partial payment
+        res_pdf = self.client.get(f'/sales/{sale.pk}/receipt.pdf')
+        self.assertEqual(res_pdf.status_code, 200)
+        self.assertTrue(len(res_pdf.content) > 0)
+
+    def test_partial_payment_status_filter_in_sales_list(self):
+        InventoryService.add_stock(self.product, 20)
+        s_paid = InventoryService.create_sale(
+            customer_name='Paid Cust',
+            payment_status='PAID',
+            items=[{'product': self.product, 'quantity': 1, 'unit_price': '2.00'}],
+        )
+        s_part = InventoryService.create_sale(
+            customer_name='Partial Cust',
+            payment_status='PARTIAL',
+            paid_amount=2.00,
+            items=[{'product': self.product, 'quantity': 2, 'unit_price': '2.00'}],
+        )
+        s_unpaid = InventoryService.create_sale(
+            customer_name='Unpaid Cust',
+            payment_status='UNPAID',
+            items=[{'product': self.product, 'quantity': 1, 'unit_price': '2.00'}],
+        )
+
+        res_part = self.client.get('/sales/?status=partial')
+        self.assertContains(res_part, 'Partial Cust')
+        self.assertNotContains(res_part, 'Paid Cust')
+        self.assertNotContains(res_part, 'Unpaid Cust')
+
+    def test_sale_create_with_unknown_custom_product(self):
+        # Create a sale with an unlisted / custom product (no product catalog ID)
+        response = self.client.post(
+            '/sales/new/',
+            {
+                'customer_name': 'Kamal Hossain',
+                'customer_phone': '01811223344',
+                'payment_status': 'PAID',
+                'items-TOTAL_FORMS': '1',
+                'items-INITIAL_FORMS': '0',
+                'items-MIN_NUM_FORMS': '1',
+                'items-MAX_NUM_FORMS': '1000',
+                'items-0-product': '',  # No catalog product
+                'items-0-custom_name': 'Special Soldering Flux 50g',
+                'items-0-quantity': 2,
+                'items-0-unit_price': '150.00',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        sale = Sale.objects.get(customer_name='Kamal Hossain')
+        self.assertEqual(sale.total_amount, 300.00)
+        self.assertEqual(sale.items.count(), 1)
+        item = sale.items.first()
+        self.assertIsNone(item.product)
+        self.assertEqual(item.custom_name, 'Special Soldering Flux 50g')
+        self.assertEqual(item.display_name, 'Special Soldering Flux 50g')
+        self.assertEqual(item.total_amount, 300.00)
+
+        # Verify receipt HTML renders custom product
+        res_receipt = self.client.get(f'/sales/{sale.pk}/receipt/')
+        self.assertEqual(res_receipt.status_code, 200)
+        self.assertContains(res_receipt, 'Special Soldering Flux 50g')
+        self.assertContains(res_receipt, 'Custom Item')
+
+        # Verify receipt PDF renders custom product
+        res_pdf = self.client.get(f'/sales/{sale.pk}/receipt.pdf')
+        self.assertEqual(res_pdf.status_code, 200)
+        self.assertEqual(res_pdf['Content-Type'], 'application/pdf')
+
+        # Verify search in sales list by custom product name
+        res_search = self.client.get('/sales/?q=Soldering+Flux')
+        self.assertContains(res_search, 'Kamal Hossain')
+        self.assertContains(res_search, 'Special Soldering Flux 50g')
+
+    def test_sale_with_mixed_catalog_and_custom_products(self):
+        InventoryService.add_stock(self.product, 5)
+        response = self.client.post(
+            '/sales/new/',
+            {
+                'customer_name': 'Mixed Buyer',
+                'payment_status': 'PAID',
+                'items-TOTAL_FORMS': '2',
+                'items-INITIAL_FORMS': '0',
+                'items-MIN_NUM_FORMS': '1',
+                'items-MAX_NUM_FORMS': '1000',
+                'items-0-product': self.product.pk,
+                'items-0-custom_name': '',
+                'items-0-quantity': 2,
+                'items-0-unit_price': '2.00',
+                'items-1-product': '',
+                'items-1-custom_name': 'Rare Resistor Pack',
+                'items-1-quantity': 1,
+                'items-1-unit_price': '25.00',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        sale = Sale.objects.get(customer_name='Mixed Buyer')
+        self.assertEqual(sale.total_amount, 29.00)
+        self.assertEqual(sale.items.count(), 2)
+
+        # Inventory for catalog product should be decremented properly
+        inv = Inventory.objects.get(product=self.product)
+        self.assertEqual(inv.quantity, 3)
+
+
+

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
@@ -13,8 +14,29 @@ def bd_now():
     return timezone.now().astimezone(BD_TZ)
 
 
+class PaymentStatus(models.TextChoices):
+    PAID = 'PAID', 'Paid'
+    PARTIAL = 'PARTIAL', 'Partial / Due'
+    UNPAID = 'UNPAID', 'Unpaid'
+
+
 class Sale(models.Model):
     customer_name = models.CharField(max_length=200, blank=True)
+    customer_phone = models.CharField(max_length=50, blank=True)
+    customer_address = models.TextField(blank=True)
+    payment_status = models.CharField(
+        max_length=10,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.PAID,
+        blank=True,
+    )
+    paid_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(0)],
+        blank=True,
+    )
     sold_at = models.DateTimeField(default=bd_now)
 
     class Meta:
@@ -22,7 +44,39 @@ class Sale(models.Model):
 
     @property
     def total_amount(self):
-        return sum(item.total_amount for item in self.items.all())
+        return sum((item.total_amount for item in self.items.all()), Decimal('0.00'))
+
+    @property
+    def effective_paid_amount(self):
+        """Amount actually paid by customer."""
+        tot = self.total_amount
+        if self.payment_status == PaymentStatus.PAID:
+            return tot
+        elif self.payment_status == PaymentStatus.UNPAID:
+            return Decimal('0.00')
+        else:  # PARTIAL
+            if self.paid_amount is None or self.paid_amount <= Decimal('0.00'):
+                return Decimal('0.00')
+            return min(self.paid_amount, tot)
+
+    @property
+    def due_amount(self):
+        """Outstanding balance due on this sale."""
+        tot = self.total_amount
+        paid = self.effective_paid_amount
+        return max(Decimal('0.00'), tot - paid)
+
+    @property
+    def is_paid(self):
+        return self.payment_status == PaymentStatus.PAID
+
+    @property
+    def is_partial(self):
+        return self.payment_status == PaymentStatus.PARTIAL
+
+    @property
+    def is_unpaid(self):
+        return self.payment_status == PaymentStatus.UNPAID
 
     def save(self, *args, **kwargs):
         """Ensure sold_at is always in BD timezone."""
@@ -35,12 +89,24 @@ class Sale(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f'Sale #{self.pk} - {self.customer_name or "Walk-in"}'
+        status_label = f" [{self.get_payment_status_display()}]"
+        return f'Sale #{self.pk} - {self.customer_name or "Walk-in"}{status_label}'
 
 
 class SaleItem(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='sale_items')
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sale_items',
+    )
+    custom_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Custom, unknown, or unlisted product name",
+    )
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
 
@@ -48,5 +114,17 @@ class SaleItem(models.Model):
     def total_amount(self):
         return self.quantity * self.unit_price
 
+    @property
+    def display_name(self):
+        if self.product:
+            return self.product.name
+        return self.custom_name or 'Custom / Unknown Item'
+
+    @property
+    def sku(self):
+        if self.product and self.product.sku:
+            return self.product.sku
+        return ''
+
     def __str__(self):
-        return f'{self.product.name} x {self.quantity} in Sale #{self.sale.pk}'
+        return f'{self.display_name} x {self.quantity} in Sale #{self.sale.pk}'

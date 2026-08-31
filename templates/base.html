@@ -31,12 +31,6 @@
             <a href="{% url 'inventory:list' %}" class="{% if 'inventory' in request.path %}active{% endif %}">
                 <span class="nav-icon">🗄</span> Inventory
             </a>
-            <a href="{% url 'suppliers:list' %}" class="{% if 'suppliers' in request.path %}active{% endif %}">
-                <span class="nav-icon">🏭</span> Suppliers
-            </a>
-            <a href="{% url 'purchases:list' %}" class="{% if 'purchases' in request.path %}active{% endif %}">
-                <span class="nav-icon">🛒</span> Purchases
-            </a>
             <a href="{% url 'sales:list' %}" class="{% if 'sales' in request.path %}active{% endif %}">
                 <span class="nav-icon">💰</span> Sales
             </a>
@@ -71,7 +65,7 @@
             <button class="icon-button mobile-menu" type="button" data-menu-toggle aria-label="Toggle menu">☰</button>
             <div>
                 <h1>{% block page_title %}Dashboard{% endblock %}</h1>
-                <p>{% block page_subtitle %}Inventory, purchases, and sales in one place.{% endblock %}</p>
+                <p>{% block page_subtitle %}Inventory and sales in one place.{% endblock %}</p>
             </div>
             {% block header_action %}{% endblock %}
         </header>

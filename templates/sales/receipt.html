@@ -80,18 +80,25 @@
         }
 
         /* ── Header ─────────────────────────────────────────── */
-        .receipt-header {
-            text-align: center;
-            padding-bottom: 16px;
+        .receipt-header-wrap {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
             border-bottom: 1.5px dashed #cbd5e1;
+            padding-bottom: 16px;
             margin-bottom: 16px;
         }
+        .receipt-header {
+            flex: 1;
+            text-align: left;
+        }
         .receipt-header h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 800;
-            letter-spacing: 2px;
+            letter-spacing: 1.5px;
             color: #0f172a;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
             text-transform: uppercase;
         }
         .receipt-subtitle {
@@ -100,19 +107,45 @@
             letter-spacing: 1.2px;
             color: #0f766e;
             text-transform: uppercase;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             display: inline-block;
         }
         .receipt-header p {
-            font-size: 12px;
+            font-size: 11.5px;
             color: #475569;
-            line-height: 1.45;
+            line-height: 1.4;
         }
         .receipt-header .contact {
-            font-size: 11.5px;
+            font-size: 11px;
             font-weight: 500;
             color: #334155;
-            margin-top: 4px;
+            margin-top: 3px;
+        }
+        .receipt-qr-top {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .receipt-qr-top img {
+            width: 58px;
+            height: 58px;
+            display: block;
+            image-rendering: pixelated;
+        }
+        .receipt-qr-top span {
+            font-size: 8px;
+            font-weight: 700;
+            color: #475569;
+            margin-top: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         /* ── Meta Details ────────────────────────────────────── */
@@ -146,6 +179,31 @@
             font-family: 'JetBrains Mono', monospace;
             font-weight: 700;
             color: #0f766e;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 9px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .status-paid {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .status-partial {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+        .status-unpaid {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
         }
 
         /* ── Items Table ─────────────────────────────────────── */
@@ -335,13 +393,21 @@
     </div>
 
     <div class="receipt-card">
-        <!-- Brand Header -->
-        <div class="receipt-header">
-            <h1>MTRONIX</h1>
-            <span class="receipt-subtitle">Electronics & Parts</span>
-            <p>Ibrahim Electric & Electronics Market</p>
-            <p>124 BCC Road, Dhaka, Bangladesh</p>
-            <p class="contact">Phone: 01706-970195 &bull; mannanelectronics111@gmail.com</p>
+        <!-- Brand Header with Top Right QR -->
+        <div class="receipt-header-wrap">
+            <div class="receipt-header">
+                <h1>MTRONIX</h1>
+                <span class="receipt-subtitle">Electronics & Parts</span>
+                <p>Ibrahim Electric & Electronics Market</p>
+                <p>124 BCC Road, Dhaka, Bangladesh</p>
+                <p class="contact">Phone: 01706-970195 &bull; mannanelectronics111@gmail.com</p>
+            </div>
+            {% if qr_code_b64 %}
+            <div class="receipt-qr-top">
+                <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR">
+                <span>Scan Location</span>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Receipt Meta -->
@@ -357,6 +423,28 @@
             <div class="meta-row">
                 <span class="meta-label">Customer</span>
                 <span class="meta-value">{{ sale.customer_name|default:"Walk-in Customer" }}</span>
+            </div>
+            {% if sale.customer_phone %}
+            <div class="meta-row">
+                <span class="meta-label">Phone</span>
+                <span class="meta-value">{{ sale.customer_phone }}</span>
+            </div>
+            {% endif %}
+            {% if sale.customer_address %}
+            <div class="meta-row">
+                <span class="meta-label">Address</span>
+                <span class="meta-value">{{ sale.customer_address }}</span>
+            </div>
+            {% endif %}
+            <div class="meta-row" style="margin-top: 4px;">
+                <span class="meta-label">Payment Status</span>
+                {% if sale.is_paid %}
+                <span class="status-badge status-paid">✓ PAID</span>
+                {% elif sale.is_partial %}
+                <span class="status-badge status-partial">🌓 PARTIAL PAYMENT</span>
+                {% else %}
+                <span class="status-badge status-unpaid">⏳ UNPAID / DUE</span>
+                {% endif %}
             </div>
         </div>
 
@@ -374,13 +462,15 @@
                 {% for item in sale.items.all %}
                 <tr>
                     <td>
-                        <span class="item-name">{{ item.product.name }}</span>
+                        <span class="item-name">{{ item.display_name }}</span>
                         <div class="item-tags">
-                            {% if item.product.group %}
+                            {% if item.product and item.product.group %}
                             <span class="item-group">{{ item.product.group.name }}</span>
+                            {% elif not item.product %}
+                            <span class="item-group" style="background: #fef3c7; color: #92400e;">Custom Item</span>
                             {% endif %}
-                            {% if item.product.sku %}
-                            <span class="item-sku">SKU: {{ item.product.sku }}</span>
+                            {% if item.sku %}
+                            <span class="item-sku">SKU: {{ item.sku }}</span>
                             {% endif %}
                         </div>
                     </td>
@@ -396,12 +486,22 @@
         <div class="totals-section">
             <div class="total-summary-row">
                 <span>Total Items: {{ sale.items.count }}</span>
-                <span>Payment: Cash</span>
+                <span>Status: {% if sale.is_paid %}<strong style="color: #065f46;">Paid</strong>{% elif sale.is_partial %}<strong style="color: #92400e;">Partial (Due: ৳{{ sale.due_amount|floatformat:2 }})</strong>{% else %}<strong style="color: #991b1b;">Unpaid</strong>{% endif %}</span>
             </div>
             <div class="total-row">
                 <span>TOTAL AMOUNT:</span>
                 <span class="amount">BDT {{ sale.total_amount|floatformat:2 }}</span>
             </div>
+            <div class="total-summary-row" style="margin-top: 6px; font-size: 13px;">
+                <span>PAID AMOUNT:</span>
+                <span style="font-weight: 700; color: #065f46;">BDT {{ sale.effective_paid_amount|floatformat:2 }}</span>
+            </div>
+            {% if sale.due_amount > 0 %}
+            <div class="total-summary-row" style="margin-top: 4px; color: #991b1b; font-weight: 800; font-size: 14px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+                <span>BALANCE DUE:</span>
+                <span>BDT {{ sale.due_amount|floatformat:2 }}</span>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Store Greeting -->
@@ -409,14 +509,6 @@
             <p class="greeting">Thank you for your purchase!</p>
             <p class="tagline">Mtronix &mdash; Your trusted electronics partner</p>
         </div>
-
-        <!-- QR Code -->
-        {% if qr_code_b64 %}
-        <div class="receipt-qr">
-            <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR">
-            <span>Scan for Store Location & Directions</span>
-        </div>
-        {% endif %}
 
         <!-- Provider Info -->
         <div class="provider-info">

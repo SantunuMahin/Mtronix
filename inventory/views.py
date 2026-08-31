@@ -1,5 +1,8 @@
 import calendar
+import datetime
+from decimal import Decimal
 from django.db import models
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -17,7 +20,6 @@ from inventory.pdf import (
 from inventory.serializers import InventorySerializer
 from inventory.services import InventoryService
 from products.models import Product
-from purchases.models import Purchase
 from sales.models import Sale, SaleItem
 
 
@@ -30,6 +32,10 @@ def _get_date_range_for_period(period):
         start = now.replace(**midnight)
         end = now.replace(**end_of_day)
         label = f"Today ({start.strftime('%b %d, %Y')})"
+    elif period == "week":
+        start = (now - datetime.timedelta(days=now.weekday())).replace(**midnight)
+        end = now.replace(**end_of_day)
+        label = f"This Week ({start.strftime('%b %d')} - {end.strftime('%b %d, %Y')})"
     elif period == "month":
         start = now.replace(day=1, **midnight)
         last_day = calendar.monthrange(now.year, now.month)[1]
@@ -53,14 +59,90 @@ class InventoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 def dashboard(request):
-    inventory = Inventory.objects.select_related('product').order_by('product__name')
-    low_stock = inventory.filter(quantity__lte=models.F('product__low_stock_threshold'))
+    period = request.GET.get('period', 'today').lower()
+    start_date, end_date, period_label = _get_date_range_for_period(period)
+
+    # Base inventory
+    inventory_qs = Inventory.objects.select_related('product', 'product__group').order_by('product__name')
+    inventory_list = list(inventory_qs)
+    total_products = Product.objects.count()
+    total_stock_units = sum(i.quantity for i in inventory_list)
+    inventory_value_cost = sum(i.quantity * i.product.purchase_price for i in inventory_list)
+    inventory_value_retail = sum(i.quantity * i.product.selling_price for i in inventory_list)
+    potential_profit = max(Decimal('0.00'), inventory_value_retail - inventory_value_cost)
+
+    low_stock = [i for i in inventory_list if i.quantity <= i.product.low_stock_threshold]
+    out_of_stock = [i for i in inventory_list if i.quantity == 0]
+
+    # Sales Analytics for selected period
+    sales_qs = Sale.objects.prefetch_related('items__product').order_by('-sold_at')
+    if start_date and end_date:
+        period_sales_qs = sales_qs.filter(sold_at__range=(start_date, end_date))
+    else:
+        period_sales_qs = sales_qs
+
+    period_sales = list(period_sales_qs)
+    period_revenue = sum(s.total_amount for s in period_sales)
+    period_paid = sum(s.effective_paid_amount for s in period_sales)
+    period_due = sum(s.due_amount for s in period_sales)
+    period_tx_count = len(period_sales)
+
+    # Calculate total units sold in period
+    items_qs = SaleItem.objects.all()
+    if start_date and end_date:
+        items_qs = items_qs.filter(sale__sold_at__range=(start_date, end_date))
+    period_units_sold = sum(item.quantity for item in items_qs)
+
+    # Store-wide all time receivables (total unpaid & partial due across all sales)
+    all_sales = list(Sale.objects.all())
+    store_total_due = sum(s.due_amount for s in all_sales)
+    store_total_revenue = sum(s.total_amount for s in all_sales)
+    store_total_paid = sum(s.effective_paid_amount for s in all_sales)
+
+    # Recent Sales (latest 8)
+    recent_sales = sales_qs[:8]
+
+    # Top 5 selling items in period
+    top_selling_qs = (
+        items_qs
+        .annotate(
+            resolved_name=Coalesce("product__name", "custom_name", models.Value("Custom / Unlisted Item")),
+            resolved_sku=Coalesce("product__sku", models.Value("—")),
+        )
+        .values("resolved_name", "resolved_sku")
+        .annotate(
+            total_qty=models.Sum("quantity"),
+            total_sales=models.Sum(
+                models.F("quantity") * models.F("unit_price"),
+                output_field=models.DecimalField(max_digits=18, decimal_places=2)
+            )
+        )
+        .order_by("-total_qty")[:5]
+    )
+    top_selling = list(top_selling_qs)
+
     context = {
-        'total_products': Product.objects.count(),
-        'current_inventory': inventory,
+        'period': period,
+        'period_label': period_label,
+        'total_products': total_products,
+        'total_stock_units': total_stock_units,
+        'inventory_value_cost': inventory_value_cost,
+        'inventory_value_retail': inventory_value_retail,
+        'potential_profit': potential_profit,
         'low_stock': low_stock,
-        'recent_sales': SaleItem.objects.select_related('product', 'sale').order_by('-sale__sold_at')[:5],
-        'recent_purchases': Purchase.objects.select_related('product', 'supplier').order_by('-purchased_at')[:5],
+        'low_stock_count': len(low_stock),
+        'out_of_stock_count': len(out_of_stock),
+        'period_revenue': period_revenue,
+        'period_paid': period_paid,
+        'period_due': period_due,
+        'period_tx_count': period_tx_count,
+        'period_units_sold': period_units_sold,
+        'store_total_due': store_total_due,
+        'store_total_revenue': store_total_revenue,
+        'store_total_paid': store_total_paid,
+        'recent_sales': recent_sales,
+        'top_selling': top_selling,
+        'current_inventory': inventory_list[:8],
     }
     return render(request, 'inventory/dashboard.html', context)
 

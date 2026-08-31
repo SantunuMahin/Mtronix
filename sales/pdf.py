@@ -69,51 +69,166 @@ def _qr_pdf_stream(
     return '\n'.join(parts)
 
 
-# ── PDF text helpers ─────────────────────────────────────────────────────────
+# ── Drawing & Vector Helpers ──────────────────────────────────────────────────
+def _sanitize_text(value: Any) -> str:
+    """Sanitize string for standard Latin-1 PDF Type1 fonts (replaces unicode symbols)."""
+    if value is None:
+        return ''
+    s = str(value)
+    s = s.replace('৳', 'BDT ').replace('$', '$').replace('€', 'EUR ').replace('£', 'GBP ').replace('¥', 'JPY ')
+    s = s.replace('\u2014', '-').replace('\u2013', '-').replace('\u2212', '-')
+    s = s.replace('\u2018', "'").replace('\u2019', "'").replace('\u201c', '"').replace('\u201d', '"')
+    s = s.replace('\u2022', '*').replace('\u00b7', '|').replace('\u2713', 'v').replace('\u2714', 'v')
+    s = s.replace('\u2192', '->').replace('\u2190', '<-').replace('\u00a0', ' ')
+    s = s.replace('🌓', '[Partial]').replace('✓', '[Paid]').replace('⚠', '[!]').replace('✨', '*').replace('📦', '')
+    return s.encode('latin-1', errors='replace').decode('latin-1')
+
+
 def _escape_pdf_string(value: Any) -> str:
     if value is None:
         return ''
-    return str(value).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+    s = _sanitize_text(value)
+    return s.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
 
 
-def _text_line(y: float, text: str, size: int = 11, x: float = 72, bold: bool = False) -> str:
+def _rect_fill(x: float, y: float, w: float, h: float, r: float = 0.96, g: float = 0.97, b: float = 0.99) -> str:
+    """Filled rectangle."""
+    return f'{r:.3f} {g:.3f} {b:.3f} rg {x:.2f} {y:.2f} {w:.2f} {h:.2f} re f'
+
+
+def _rect_stroke(x: float, y: float, w: float, h: float, r: float = 0.85, g: float = 0.88, b: float = 0.92, line_width: float = 0.75) -> str:
+    """Stroked rectangular border."""
+    return f'{line_width:.2f} w {r:.3f} {g:.3f} {b:.3f} RG {x:.2f} {y:.2f} {w:.2f} {h:.2f} re S'
+
+
+def _rect_card(
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    bg: tuple[float, float, float] = (0.975, 0.985, 0.995),
+    border: tuple[float, float, float] = (0.88, 0.91, 0.94),
+    line_width: float = 0.75,
+) -> str:
+    """Filled and bordered card box."""
+    return (
+        f'{bg[0]:.3f} {bg[1]:.3f} {bg[2]:.3f} rg '
+        f'{border[0]:.3f} {border[1]:.3f} {border[2]:.3f} RG '
+        f'{line_width:.2f} w '
+        f'{x:.2f} {y:.2f} {w:.2f} {h:.2f} re B'
+    )
+
+
+def _line(x1: float, y1: float, x2: float, y2: float, r: float = 0.85, g: float = 0.88, b: float = 0.92, width: float = 0.75) -> str:
+    """Vector line."""
+    return f'{width:.2f} w {r:.3f} {g:.3f} {b:.3f} RG {x1:.2f} {y1:.2f} m {x2:.2f} {y2:.2f} l S'
+
+
+def _divider(y: float, size: int = 10, r: float = 0.88, g: float = 0.91, b: float = 0.94, width: float = 0.75, x1: float = 54, x2: float = 558) -> str:
+    """Geometric divider line across page margins."""
+    return _line(x1, y, x2, y, r, g, b, width)
+
+
+def _text_line(
+    y: float,
+    text: str,
+    size: int = 10,
+    x: float = 54,
+    bold: bool = False,
+    r: float = 0.06,
+    g: float = 0.09,
+    b: float = 0.16,
+) -> str:
     font = '/F2' if bold else '/F1'
     return (
+        f'{r:.3f} {g:.3f} {b:.3f} rg '
         f'BT {font} {size} Tf {x:.2f} {y:.2f} Td '
         f'({_escape_pdf_string(text)}) Tj ET'
     )
 
 
-def _divider(y: float, size: int = 10) -> str:
-    return _text_line(y, '-' * 86, size)
+def _text_right(
+    y: float,
+    text: str,
+    size: int = 9,
+    x_right: float = 550,
+    bold: bool = False,
+    r: float = 0.06,
+    g: float = 0.09,
+    b: float = 0.16,
+) -> str:
+    """Render right-aligned text."""
+    approx_w = len(str(text)) * (size * 0.52)
+    x = max(54.0, x_right - approx_w)
+    return _text_line(y, text, size=size, x=x, bold=bold, r=r, g=g, b=b)
+
+
+def _badge(
+    x: float,
+    y: float,
+    text: str,
+    bg: tuple[float, float, float] = (0.82, 0.98, 0.90),
+    fg: tuple[float, float, float] = (0.02, 0.37, 0.27),
+    w: float = 50,
+    h: float = 14,
+    size: int = 8,
+) -> str:
+    """Render a colored status badge."""
+    ops = [
+        _rect_fill(x, y, w, h, bg[0], bg[1], bg[2]),
+        _rect_stroke(x, y, w, h, bg[0]*0.9, bg[1]*0.9, bg[2]*0.9, 0.5),
+        _text_line(y + 3.5, text, size=size, x=x + 4, bold=True, r=fg[0], g=fg[1], b=fg[2]),
+    ]
+    return '\n'.join(ops)
+
+
+def _render_kpi_cards(
+    y: float,
+    cards: Sequence[tuple[str, str, tuple[float, float, float]]],
+    h: float = 44,
+) -> list[str]:
+    """
+    Render 3 or 4 sleek KPI metric cards side-by-side.
+    cards: list of (label, value, accent_rgb)
+    """
+    ops: list[str] = []
+    n = len(cards)
+    if n == 0:
+        return ops
+
+    total_w = 504.0
+    gap = 10.0
+    card_w = (total_w - (n - 1) * gap) / n
+
+    for i, (label, val, accent) in enumerate(cards):
+        cx = 54.0 + i * (card_w + gap)
+        # Background & border
+        ops.append(_rect_card(cx, y, card_w, h, bg=(0.985, 0.99, 1.0), border=(0.85, 0.88, 0.92)))
+        # Top color accent bar (2.5pt)
+        ops.append(_line(cx, y + h, cx + card_w, y + h, r=accent[0], g=accent[1], b=accent[2], width=2.5))
+        # Label (small muted uppercase)
+        ops.append(_text_line(y + h - 14, label.upper(), size=7.5, x=cx + 8, bold=True, r=0.39, g=0.45, b=0.55))
+        # Value (bold dark)
+        ops.append(_text_line(y + 8, val, size=11.5, x=cx + 8, bold=True, r=0.06, g=0.09, b=0.16))
+
+    return ops
 
 
 # ── Timezone helpers ─────────────────────────────────────────────────────────
 def _bd_now() -> str:
-    """Return the current Bangladesh time as a formatted string."""
-    return timezone.now().astimezone(BD_TZ).strftime('%d %b %Y, %I:%M %p %A')
+    """Return current Bangladesh time as formatted string."""
+    return timezone.now().astimezone(BD_TZ).strftime('%d %b %Y, %I:%M %p')
 
 
 def _bd_time(dt) -> str:
-    """Convert a Django-aware UTC datetime to Bangladesh time as a formatted string."""
-    return timezone.localtime(dt, BD_TZ).strftime('%d %b %Y, %I:%M %p %A')
+    """Convert Django datetime to Bangladesh time formatted string."""
+    return timezone.localtime(dt, BD_TZ).strftime('%d %b %Y, %I:%M %p')
 
 
 # ── Multi-page PDF builder ───────────────────────────────────────────────────
 class PdfBuilder:
-    """
-    Multi-page PDF assembler.
-
-    Usage
-    -----
-    builder = PdfBuilder()
-    builder.add_page(streams)   # list of PDF operator strings for page 1
-    builder.add_page(streams)   # page 2, etc.
-    return builder.build()
-    """
-
     def __init__(self, auto_print: bool = False) -> None:
-        self._pages: List[List[str]] = []   # one list of operator strings per page
+        self._pages: List[List[str]] = []
         self.auto_print = auto_print
 
     def add_page(self, streams: List[str]) -> None:
@@ -123,39 +238,23 @@ class PdfBuilder:
         if not self._pages:
             self.add_page([])
 
-        out      = io.BytesIO()
-        obj_data : List[bytes] = []   # raw bytes for each indirect object
-        offsets  : List[int]   = []   # byte offset of each object
-
-        def next_obj_num() -> int:
-            return len(obj_data) + 1   # 1-based
-
-        # ── Reserve object slots ─────────────────────────────────────────────
-        # 1 = Catalog, 2 = Pages, 3 = Font F1 (regular), 4 = Font F2 (bold)
-        # 5..4+N = Page objects, 5+N..4+2N = Content stream objects
-
-        n          = len(self._pages)
-        CATALOG    = 1
-        PAGES      = 2
-        FONT_F1    = 3
-        FONT_F2    = 4
-        PAGE_START = 5                    # page objects: 5 … 4+n
-        CONT_START = PAGE_START + n       # content streams: 5+n … 4+2n
+        n = len(self._pages)
+        CATALOG = 1
+        PAGES = 2
+        FONT_F1 = 3
+        FONT_F2 = 4
+        PAGE_START = 5
+        CONT_START = PAGE_START + n
 
         page_obj_nums = [PAGE_START + i for i in range(n)]
         cont_obj_nums = [CONT_START + i for i in range(n)]
-        total_objs    = 4 + 2 * n         # catalog+pages+2 fonts + n pages + n streams
+        total_objs = 4 + 2 * n
 
-        # ── Build content streams first (we need their lengths) ──────────────
         content_streams: List[bytes] = []
         for streams in self._pages:
             raw = '\n'.join(s for s in streams if s).encode('latin-1', errors='replace')
             content_streams.append(raw)
 
-        # ── Assemble raw object bytes (in object-number order 1…total) ──────
-        # We'll write them in order and track offsets.
-
-        # Catalog (obj 1)
         if self.auto_print:
             catalog_bytes = (
                 f'{CATALOG} 0 obj\n'
@@ -169,7 +268,6 @@ class PdfBuilder:
                 f'endobj\n'
             ).encode('ascii')
 
-        # Pages (obj 2) – Kids list
         kids = ' '.join(f'{num} 0 R' for num in page_obj_nums)
         pages_bytes = (
             f'{PAGES} 0 obj\n'
@@ -177,14 +275,12 @@ class PdfBuilder:
             f'endobj\n'
         ).encode('ascii')
 
-        # Font F1 – Helvetica (obj 3)
         font_f1_bytes = (
             f'{FONT_F1} 0 obj\n'
             f'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\n'
             f'endobj\n'
         ).encode('ascii')
 
-        # Font F2 – Helvetica-Bold (obj 4)
         font_f2_bytes = (
             f'{FONT_F2} 0 obj\n'
             f'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\n'
@@ -193,109 +289,83 @@ class PdfBuilder:
 
         fixed_objects = [catalog_bytes, pages_bytes, font_f1_bytes, font_f2_bytes]
 
-        # Page objects (objs 5 … 4+n)
         page_objects: List[bytes] = []
         for i, (page_num, cont_num) in enumerate(zip(page_obj_nums, cont_obj_nums)):
             page_bytes = (
                 f'{page_num} 0 obj\n'
-                f'<< /Type /Page /Parent {PAGES} 0 R '
-                f'/MediaBox [0 0 {PAGE_WIDTH} {PAGE_HEIGHT}] '
-                f'/Resources << /Font << /F1 {FONT_F1} 0 R /F2 {FONT_F2} 0 R >> >> '
-                f'/Contents {cont_num} 0 R >>\n'
+                f'<< /Type /Page /Parent {PAGES} 0 R\n'
+                f'   /MediaBox [0 0 {PAGE_WIDTH} {PAGE_HEIGHT}]\n'
+                f'   /Contents {cont_num} 0 R\n'
+                f'   /Resources << /Font << /F1 {FONT_F1} 0 R /F2 {FONT_F2} 0 R >> >>\n'
+                f'>>\n'
                 f'endobj\n'
             ).encode('ascii')
             page_objects.append(page_bytes)
 
-        # Content stream objects (objs 5+n … 4+2n)
         stream_objects: List[bytes] = []
-        for cont_num, raw in zip(cont_obj_nums, content_streams):
-            stream_obj = (
+        for cont_num, raw_stream in zip(cont_obj_nums, content_streams):
+            stream_head = (
                 f'{cont_num} 0 obj\n'
-                f'<< /Length {len(raw)} >>\n'
+                f'<< /Length {len(raw_stream)} >>\n'
                 f'stream\n'
-            ).encode('ascii') + raw + b'\nendstream\nendobj\n'
-            stream_objects.append(stream_obj)
+            ).encode('ascii')
+            stream_foot = b'\nendstream\nendobj\n'
+            stream_objects.append(stream_head + raw_stream + stream_foot)
 
         all_objects = fixed_objects + page_objects + stream_objects
 
-        # ── Write PDF ────────────────────────────────────────────────────────
-        out.write(b'%PDF-1.4\n')
-        for obj in all_objects:
-            offsets.append(out.tell())
-            out.write(obj)
+        out = io.BytesIO()
+        out.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
+        offsets: List[int] = []
 
-        # ── xref table ───────────────────────────────────────────────────────
-        xref_pos = out.tell()
+        for obj_b in all_objects:
+            offsets.append(out.tell())
+            out.write(obj_b)
+
+        xref_offset = out.tell()
         out.write(f'xref\n0 {total_objs + 1}\n'.encode('ascii'))
         out.write(b'0000000000 65535 f \n')
-        for offset in offsets:
-            out.write(f'{offset:010d} 00000 n \n'.encode('ascii'))
+        for off in offsets:
+            out.write(f'{off:010d} 00000 n \n'.encode('ascii'))
 
-        # ── trailer ──────────────────────────────────────────────────────────
-        out.write(
-            b'trailer\n' +
-            f'<< /Size {total_objs + 1} /Root {CATALOG} 0 R >>\n'.encode('ascii') +
-            b'startxref\n' +
-            str(xref_pos).encode('ascii') +
-            b'\n%%EOF\n'
+        trailer = (
+            f'trailer\n'
+            f'<< /Size {total_objs + 1} /Root {CATALOG} 0 R >>\n'
+            f'startxref\n'
+            f'{xref_offset}\n'
+            f'%%EOF\n'
         )
+        out.write(trailer.encode('ascii'))
         return out.getvalue()
 
 
-# ── Page composer helper ─────────────────────────────────────────────────────
+# ── Page Composer ────────────────────────────────────────────────────────────
 class PageComposer:
-    """
-    Tracks the current Y position across multiple pages and automatically
-    starts a new page when content would overflow.
+    Y_TOP = 760
+    Y_BOTTOM = 80
 
-    Usage
-    -----
-    pc = PageComposer(builder, header_fn=my_header, footer_fn=my_footer)
-    pc.ensure(20)          # ensure 20 pts of space, start new page if needed
-    pc.add(_text_line(...))
-    pc.add(_divider(...))  # pass pre-built operator strings
-    pc.finish()            # flush last page (adds footer/QR)
-    """
-
-    Y_START  = 740   # first content line y after page header
-    Y_BOTTOM = 110   # minimum y before page break (leaves room for footer)
-
-    def __init__(
-        self,
-        builder: PdfBuilder,
-        page_num_total: int = 0,   # 0 = unknown
-        header_fn=None,
-        footer_fn=None,
-    ) -> None:
-        self._builder   = builder
-        self._header_fn = header_fn   # callable(page_no) -> List[str]
-        self._footer_fn = footer_fn   # callable(page_no, is_last) -> List[str]
-        self._page_no   = 0
-        self._streams   : List[str] = []
-        self._y         = self.Y_START
-        self._is_first_page = True
-        self._new_page()              # start page 1 immediately
+    def __init__(self, builder: PdfBuilder, header_fn=None, footer_fn=None) -> None:
+        self._builder = builder
+        self._header_fn = header_fn
+        self._footer_fn = footer_fn
+        self._page_no = 0
+        self._streams: List[str] = []
+        self._y = self.Y_TOP
+        self._new_page()
 
     def _new_page(self) -> None:
-        # Don't close previous page if this is the first page
         if self._page_no > 0:
             self._close_page(is_last=False)
-
         self._page_no += 1
         self._streams = []
-        self._y       = self.Y_START
+        self._y = self.Y_TOP
 
         if self._header_fn:
             header_ops = self._header_fn(self._page_no)
+            self._streams.extend(header_ops)
+            lowest_y = self.Y_TOP
             for op in header_ops:
-                self._streams.append(op)
-
-            # Extract the lowest Y position from header operations
-            lowest_y = self.Y_START
-            for op in header_ops:
-                if op and 'Td' in op:
-                    # Parse Y coordinate from the PDF operator
-                    # Format: BT /F1 11 Tf 72.00 740.00 Td (text) Tj ET
+                if ' Td ' in op:
                     try:
                         parts = op.split('Td')[0].split()
                         if len(parts) >= 2:
@@ -303,10 +373,7 @@ class PageComposer:
                             lowest_y = min(lowest_y, y_val)
                     except (ValueError, IndexError):
                         pass
-
-            # Set Y position just below the lowest header element
-            # Subtract extra space for the font size and padding
-            self._y = lowest_y - 20
+            self._y = lowest_y - 16
 
     def _close_page(self, is_last: bool) -> None:
         if self._footer_fn:
@@ -315,28 +382,24 @@ class PageComposer:
         self._builder.add_page(self._streams)
 
     def ensure(self, needed: float) -> None:
-        """Start a new page if there isn't enough vertical space."""
         if self._y - needed < self.Y_BOTTOM:
             self._new_page()
 
     def add(self, op: str, dy: float = 0) -> None:
-        """Append an operator string; optionally advance y by dy afterwards."""
         if op:
             self._streams.append(op)
         if dy:
             self._y -= dy
 
-    def add_line(self, text: str, size: int = 11, x: float = 72,
-                 bold: bool = False, dy: float | None = None) -> None:
-        """Render a text line at current y and advance."""
+    def add_line(self, text: str, size: int = 10, x: float = 54, bold: bool = False, dy: float | None = None, r: float = 0.06, g: float = 0.09, b: float = 0.16) -> None:
         self.ensure(size + 4)
-        self._streams.append(_text_line(self._y, text, size, x, bold))
+        self._streams.append(_text_line(self._y, text, size, x, bold, r, g, b))
         self._y -= dy if dy is not None else size + 4
 
     def add_divider(self, size: int = 10) -> None:
-        self.ensure(size + 4)
-        self._streams.append(_divider(self._y, size))
-        self._y -= size + 4
+        self.ensure(10)
+        self._streams.append(_divider(self._y))
+        self._y -= 10
 
     @property
     def y(self) -> float:
@@ -349,232 +412,473 @@ class PageComposer:
         self._close_page(is_last=True)
 
 
-# ── Shared footer / QR builders ──────────────────────────────────────────────
+# ── Shared Executive Footer ──────────────────────────────────────────────────
 def _make_footer_ops(
     page_no: int,
     is_last: bool,
-    qr_matrix: List[List[bool]],
-    qr_cell: float,
-    extra_lines: List[str],   # additional footer text ops already built
+    *args,
 ) -> List[str]:
-    """
-    Return PDF operator strings for the standard footer area.
-    QR code appears bottom-right on the LAST page only.
-    """
-    ops: List[str] = []
-
-    # page number
-    ops.append(_text_line(30, f'Page {page_no}', 8, PAGE_WIDTH // 2 - 10))
-
-    # shared footer text
-    ops.extend(extra_lines)
-
-    # QR on last page only
-    if is_last and qr_matrix:
-        qr_size_pts = len(qr_matrix) * qr_cell
-        qr_x        = PAGE_WIDTH - 54 - qr_size_pts
-        qr_y_bottom = 24
-        ops.append(_text_line(qr_y_bottom + qr_size_pts + 3, 'Scan for location', 7, int(qr_x)))
-        ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y_bottom, qr_cell))
-
+    """Render a clean executive footer across all pages."""
+    ops: List[str] = [
+        _line(54, 52, 558, 52, r=0.88, g=0.91, b=0.94, width=0.75),
+        _text_line(38, f'Mtronix: {MTRONIX_ADDRESS}', 7.5, 54, r=0.39, g=0.45, b=0.55),
+        _text_line(26, f'Ph: {MTRONIX_PHONE}  |  Email: {MTRONIX_EMAIL}', 7.5, 54, r=0.39, g=0.45, b=0.55),
+        _text_line(38, f'Page {page_no}', 8, 510, bold=True, r=0.06, g=0.09, b=0.16),
+        _text_line(26, f'Software: Intlisoft Innovation ({INTLISOFT_PHONE})', 7.5, 330, r=0.47, g=0.53, b=0.62),
+    ]
     return ops
 
 
-# ── Sale Receipt ─────────────────────────────────────────────────────────────
+# ── 1. Sale Receipt PDF ──────────────────────────────────────────────────────
 def build_sale_receipt_pdf(sale) -> bytes:
-    """Generate a multi-page PDF receipt for the given Sale instance."""
-    sold_at  = _bd_time(sale.sold_at)
-    customer = sale.customer_name or 'Walk-in'
+    """Generate a high-end multi-page PDF receipt for the given Sale instance."""
+    sold_at = _bd_time(sale.sold_at)
+    customer = sale.customer_name or 'Walk-in Customer'
+    phone = sale.customer_phone or ''
+    address = sale.customer_address or ''
+    status_str = sale.get_payment_status_display().upper() if hasattr(sale, 'get_payment_status_display') else str(sale.payment_status).upper()
+    is_paid = (sale.payment_status == 'PAID')
+    is_partial = (sale.payment_status == 'PARTIAL')
+    paid_amt = float(sale.effective_paid_amount)
+    due_amt = float(sale.due_amount)
 
     qr_matrix = _build_qr_matrix(MAPS_URL)
-    qr_cell   = 1.1
-
-    # Pre-built footer text operators (same on every page)
-    footer_text_ops = [
-        _divider(82, 8),
-        _text_line(70, f'Mtronix: {MTRONIX_ADDRESS}', 8),
-        _text_line(58, f'Ph: {MTRONIX_PHONE}  |  Email: {MTRONIX_EMAIL}', 8),
-        _divider(48, 7),
-        _text_line(36, 'This is a computer-generated receipt.', 8),
-        _text_line(24, (
-            f'Software Provider: Intlisoft Innovation  |  '
-            f'Ph: {INTLISOFT_PHONE}  |  Email: {INTLISOFT_EMAIL}'
-        ), 8),
-    ]
+    qr_cell = 1.05
 
     def header(page_no: int) -> List[str]:
-        ops = [
-            _text_line(760, 'Mtronix Sales Receipt', 18, bold=True),
-            _text_line(738, f'Receipt No : SALE-{sale.pk:05d}', 11),
-            _text_line(722, f'Date       : {sold_at}', 11),
-            _text_line(706, f'Customer   : {customer}', 11),
-            _text_line(692, f'Address    : {MTRONIX_ADDRESS}', 9),
-            _text_line(680, f'Phone      : {MTRONIX_PHONE}    Email: {MTRONIX_EMAIL}', 9),
-            _divider(668),
-        ]
+        ops = []
         if page_no == 1:
-            # Column headers only on page 1
-            ops += [
-                _text_line(650, 'Item',        12,  72, bold=True),
-                _text_line(650, 'SKU',         12, 270, bold=True),
-                _text_line(650, 'Qty',         12, 355, bold=True),
-                _text_line(650, 'Unit (BDT)',  12, 405, bold=True),
-                _text_line(650, 'Total (BDT)', 12, 500, bold=True),
-                _divider(635),
-            ]
+            # ── Brand Header ──
+            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.06, g=0.09, b=0.16))
+            ops.append(_text_line(748, 'ELECTRONICS, HARDWARE & COMPONENTS', 8, 54, bold=True, r=0.06, g=0.46, b=0.43))
+            ops.append(_text_line(735, '124 BCC Road, Ibrahim Market, Dhaka, Bangladesh', 8, 54, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(723, f'Phone: {MTRONIX_PHONE}  |  {MTRONIX_EMAIL}', 8, 54, r=0.39, g=0.45, b=0.55))
+
+            # ── QR Code Top Right ──
+            if qr_matrix:
+                qr_size = len(qr_matrix) * qr_cell
+                card_w = qr_size + 14
+                card_h = qr_size + 20
+                card_x = 558 - card_w
+                card_y = 712
+                qr_x = card_x + 7
+                qr_y = card_y + 4
+                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(0.98, 0.99, 1.0), border=(0.85, 0.88, 0.92)))
+                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.39, g=0.45, b=0.55))
+                ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y, qr_cell))
+
+            # Divider below brand
+            ops.append(_line(54, 710, 558, 710, r=0.06, g=0.09, b=0.16, width=1.5))
+
+            # ── Meta Box ──
+            ops.append(_rect_card(54, 642, 504, 60, bg=(0.975, 0.985, 0.995), border=(0.88, 0.91, 0.94)))
+            
+            # Left col: Invoice & Date
+            ops.append(_text_line(685, 'INVOICE NO', 7.5, 68, bold=True, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(671, f'SALE-{sale.pk:05d}', 11, 68, bold=True, r=0.06, g=0.46, b=0.43))
+            ops.append(_text_line(655, f'Date: {sold_at}', 8.5, 68, r=0.28, g=0.33, b=0.41))
+
+            # Right col: Customer & Status
+            ops.append(_text_line(685, 'CUSTOMER DETAILS', 7.5, 290, bold=True, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(671, customer, 10.5, 290, bold=True, r=0.06, g=0.09, b=0.16))
+            cust_sub = f'Phone: {phone}' if phone else ''
+            if address:
+                cust_sub += f'  |  {address}' if cust_sub else address
+            if cust_sub:
+                ops.append(_text_line(656, cust_sub[:42], 8, 290, r=0.39, g=0.45, b=0.55))
+
+            # Payment badge
+            if is_paid:
+                ops.append(_badge(476, 672, 'PAID', bg=(0.82, 0.98, 0.90), fg=(0.02, 0.37, 0.27), w=66, h=16, size=8.5))
+            elif is_partial:
+                ops.append(_badge(476, 672, 'PARTIAL', bg=(0.99, 0.95, 0.78), fg=(0.57, 0.25, 0.05), w=66, h=16, size=8.5))
+            else:
+                ops.append(_badge(476, 672, 'UNPAID', bg=(0.99, 0.89, 0.89), fg=(0.60, 0.11, 0.11), w=66, h=16, size=8.5))
+
+            curr_y = 626
+            # ── Table Header Bar ──
+            ops.append(_rect_fill(54, curr_y - 4, 504, 20, r=0.06, g=0.09, b=0.16))
+            ops.append(_text_line(curr_y + 2, 'ITEM DESCRIPTION', 8.5, 66, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_text_line(curr_y + 2, 'SKU', 8.5, 260, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_text_right(curr_y + 2, 'QTY', 8.5, 370, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_text_right(curr_y + 2, 'UNIT PRICE (BDT)', 8.5, 460, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 8.5, 550, bold=True, r=1.0, g=1.0, b=1.0))
         else:
-            ops += [
-                _text_line(650, f'... continued (page {page_no})', 9),
-                _text_line(636, 'Item',        10,  72, bold=True),
-                _text_line(636, 'SKU',         10, 270, bold=True),
-                _text_line(636, 'Qty',         10, 355, bold=True),
-                _text_line(636, 'Unit (BDT)',  10, 405, bold=True),
-                _text_line(636, 'Total (BDT)', 10, 500, bold=True),
-                _divider(623),
-            ]
+            ops.append(_text_line(760, f'Mtronix Sales Receipt - SALE-{sale.pk:05d} (Page {page_no})', 9, 54, bold=True, r=0.39, g=0.45, b=0.55))
+            ops.append(_line(54, 750, 558, 750, r=0.88, g=0.91, b=0.94, width=0.75))
+            curr_y = 732
+            ops.append(_rect_fill(54, curr_y - 4, 504, 18, r=0.06, g=0.09, b=0.16))
+            ops.append(_text_line(curr_y + 1, 'ITEM DESCRIPTION', 8, 66, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_text_line(curr_y + 1, 'SKU', 8, 260, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_text_right(curr_y + 1, 'QTY', 8, 370, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_text_right(curr_y + 1, 'UNIT PRICE (BDT)', 8, 460, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 8, 550, bold=True, r=1.0, g=1.0, b=1.0))
+
         return ops
 
     def footer(page_no: int, is_last: bool) -> List[str]:
-        return _make_footer_ops(page_no, is_last, qr_matrix, qr_cell, footer_text_ops)
+        return _make_footer_ops(page_no, is_last)
 
     builder = PdfBuilder(auto_print=True)
     pc = PageComposer(builder, header_fn=header, footer_fn=footer)
 
-    # ── Item rows ────────────────────────────────────────────────────────────
-    for item in sale.items.select_related('product').all():
-        pc.ensure(22)
+    # ── Item Rows with Zebra Striping ──
+    for idx, item in enumerate(sale.items.select_related('product').all()):
+        pc.ensure(20)
         y = pc.y
+        # Zebra shading on odd rows
+        if idx % 2 == 1:
+            pc._streams.append(_rect_fill(54, y - 4, 504, 18, 0.975, 0.985, 0.995))
+        pc._streams.append(_line(54, y - 4, 558, y - 4, 0.90, 0.92, 0.95, 0.5))
 
-        # Place all column text at the same Y position (single row)
-        pc._streams.append(_text_line(y, item.product.name,          11,  72))
-        pc._streams.append(_text_line(y, item.product.sku or '—',    11, 270))
-        pc._streams.append(_text_line(y, str(item.quantity),         11, 355))
-        pc._streams.append(_text_line(y, f'{item.unit_price:.2f}',   11, 405))
-        pc._streams.append(_text_line(y, f'{item.total_amount:.2f}', 11, 500))
+        p_name = _sanitize_text(item.display_name)[:30]
+        sku_val = _sanitize_text(item.sku) if item.sku else '-'
 
-        # Advance Y position for next row
-        pc.skip(20)
+        pc._streams.append(_text_line(y, p_name, 9, 66, bold=True, r=0.06, g=0.09, b=0.16))
+        pc._streams.append(_text_line(y, sku_val, 8.5, 260, r=0.39, g=0.45, b=0.55))
+        pc._streams.append(_text_right(y, str(item.quantity), 9, 370, r=0.06, g=0.09, b=0.16))
+        pc._streams.append(_text_right(y, f'{item.unit_price:.2f}', 9, 460, r=0.06, g=0.09, b=0.16))
+        pc._streams.append(_text_right(y, f'{item.total_amount:.2f}', 9.5, 550, bold=True, r=0.06, g=0.09, b=0.16))
+        pc.skip(18)
 
-    # ── Totals & closing lines ───────────────────────────────────────────────
-    pc.ensure(100)
-    pc.add_divider()
-    pc.add_line(f'Total Amount:  BDT {sale.total_amount:.2f}', 14, 350, bold=True)
-    pc.skip(4)
-    pc.add_divider(9)
-    pc.skip(4)
-    pc.add_line('Thank you for your purchase!', 11)
-    pc.add_line('Mtronix — Your trusted electronics partner.', 10)
+    # ── Financial Totals Box ──
+    pc.ensure(110)
+    pc.skip(8)
+    y = pc.y
+    box_w = 230.0
+    box_x = 558.0 - box_w
+    has_due = (due_amt > 0)
+    box_h = 88.0 if has_due else 64.0
 
+    pc._streams.append(_rect_card(box_x, y - box_h, box_w, box_h, bg=(0.98, 0.985, 0.995), border=(0.85, 0.88, 0.92)))
+    
+    # Total Amount
+    pc._streams.append(_text_line(y - 18, 'TOTAL AMOUNT:', 9.5, box_x + 14, bold=True, r=0.06, g=0.09, b=0.16))
+    pc._streams.append(_text_line(y - 18, f'BDT {sale.total_amount:.2f}', 12, box_x + 120, bold=True, r=0.06, g=0.46, b=0.43))
+    
+    # Paid Amount
+    pc._streams.append(_text_line(y - 34, 'PAID AMOUNT:', 9, box_x + 14, bold=True, r=0.02, g=0.37, b=0.27))
+    pc._streams.append(_text_line(y - 34, f'BDT {paid_amt:.2f}', 10.5, box_x + 120, bold=True, r=0.02, g=0.37, b=0.27))
+
+    # Payment Status
+    pc._streams.append(_text_line(y - 50, 'Payment Status:', 8.5, box_x + 14, r=0.39, g=0.45, b=0.55))
+    pc._streams.append(_text_line(y - 50, status_str, 9, box_x + 120, bold=True, r=(0.02 if is_paid else (0.57 if is_partial else 0.60)), g=(0.37 if is_paid else (0.25 if is_partial else 0.11)), b=(0.27 if is_paid else (0.05 if is_partial else 0.11))))
+
+    if has_due:
+        pc._streams.append(_line(box_x + 10, y - 60, box_x + box_w - 10, y - 60, 0.88, 0.91, 0.94, 0.5))
+        pc._streams.append(_text_line(y - 76, 'BALANCE DUE:', 9.5, box_x + 14, bold=True, r=0.60, g=0.11, b=0.11))
+        pc._streams.append(_text_line(y - 76, f'BDT {due_amt:.2f}', 12, box_x + 120, bold=True, r=0.60, g=0.11, b=0.11))
+
+    # Notes on left side of totals
+    pc._streams.append(_text_line(y - 18, 'Thank you for your purchase!', 10.5, 54, bold=True, r=0.06, g=0.09, b=0.16))
+    pc._streams.append(_text_line(y - 32, 'Warranty claims valid with this invoice.', 8, 54, r=0.39, g=0.45, b=0.55))
+    pc._streams.append(_text_line(y - 44, 'Computer-generated receipt, valid without signature.', 8, 54, r=0.39, g=0.45, b=0.55))
+
+    pc.skip(box_h + 16)
     pc.finish()
     return builder.build()
 
 
-# ── Sales Report ─────────────────────────────────────────────────────────────
-def build_sales_report_pdf(report_data: dict[str, Any]) -> bytes:
-    """Generate a multi-page sales summary report PDF."""
+# ── 2. Customer Account Statement PDF ─────────────────────────────────────────
+def build_customer_statement_pdf(data: dict[str, Any]) -> bytes:
+    """Generate executive consolidated customer account statement PDF."""
+    customer_name = data.get('customer_name') or 'Valued Customer'
+    customer_phone = data.get('customer_phone') or ''
+    customer_address = data.get('customer_address') or ''
+    is_multi_customer = data.get('is_multi_customer', False)
+    distinct_count = data.get('distinct_customer_count', 1)
+    filter_label = data.get('filter_label') or 'All Transactions'
+    generated = data.get('generated_at') or _bd_now()
+
+    total_billed = float(data.get('total_billed', 0.0))
+    total_paid = float(data.get('total_paid', 0.0))
+    total_due = float(data.get('total_due', 0.0))
+    items = data.get('items', [])
+
     qr_matrix = _build_qr_matrix(MAPS_URL)
-    qr_cell   = 1.1
-
-    # generated_at may be a datetime object, an already-formatted string, or None.
-    # Only pass it through _bd_time() if it's an actual datetime; otherwise use as-is
-    # (already formatted string) or fall back to the current BD time.
-    raw_dt    = report_data.get('generated_at')
-    if isinstance(raw_dt, datetime.datetime):
-        generated = _bd_time(raw_dt)
-    elif isinstance(raw_dt, str) and raw_dt:
-        generated = raw_dt          # already a formatted string — use directly
-    else:
-        generated = _bd_now()       # None or missing — use current time
-
-    footer_text_ops = [
-        _divider(82, 8),
-        _text_line(70, f'Mtronix: {MTRONIX_ADDRESS}', 8),
-        _text_line(58, f'Ph: {MTRONIX_PHONE}  |  Email: {MTRONIX_EMAIL}', 8),
-        _divider(48, 7),
-        _text_line(36, 'Mtronix Sales & Inventory System — Confidential Report', 8),
-        _text_line(24, (
-            f'Software Provider: Intlisoft Innovation  |  '
-            f'Ph: {INTLISOFT_PHONE}  |  Email: {INTLISOFT_EMAIL}'
-        ), 8),
-    ]
+    qr_cell = 1.05
 
     def header(page_no: int) -> List[str]:
-        ops = [
-            _text_line(760, 'Mtronix Sales Summary Report', 18, bold=True),
-            _text_line(738, f'Period    : {report_data["period_label"]}', 11),
-            _text_line(722, f'Generated : {generated}', 9),
-            _text_line(708, f'Address   : {MTRONIX_ADDRESS}', 9),
-            _text_line(696, f'Phone     : {MTRONIX_PHONE}    Email: {MTRONIX_EMAIL}', 9),
-            _divider(682),
-        ]
+        ops = []
         if page_no == 1:
-            ops += [
-                _text_line(664, f'Total Revenue  : BDT {report_data["total_revenue"]:.2f}', 12,  72, bold=True),
-                _text_line(664, f'Items Sold     : {report_data["total_items_sold"]}',       12, 280, bold=True),
-                _text_line(664, f'Transactions   : {report_data["total_transactions"]}',     12, 440, bold=True),
-                _divider(648),
+            # ── Brand Header ──
+            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.06, g=0.09, b=0.16))
+            sub_title = 'CONSOLIDATED SALES & CUSTOMER LEDGER' if is_multi_customer else 'CUSTOMER ACCOUNT STATEMENT & LEDGER'
+            ops.append(_text_line(748, sub_title, 8.5, 54, bold=True, r=0.06, g=0.46, b=0.43))
+            ops.append(_text_line(735, '124 BCC Road, Ibrahim Market, Dhaka, Bangladesh', 8, 54, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(723, f'Phone: {MTRONIX_PHONE}  |  {MTRONIX_EMAIL}', 8, 54, r=0.39, g=0.45, b=0.55))
+
+            if qr_matrix:
+                qr_size = len(qr_matrix) * qr_cell
+                card_w = qr_size + 14
+                card_h = qr_size + 20
+                card_x = 558 - card_w
+                card_y = 712
+                qr_x = card_x + 7
+                qr_y = card_y + 4
+                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(0.98, 0.99, 1.0), border=(0.85, 0.88, 0.92)))
+                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.39, g=0.45, b=0.55))
+                ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y, qr_cell))
+
+            ops.append(_line(54, 710, 558, 710, r=0.06, g=0.09, b=0.16, width=1.5))
+
+            # ── Customer / Account Info Box ──
+            ops.append(_rect_card(54, 652, 504, 50, bg=(0.975, 0.985, 0.995), border=(0.88, 0.91, 0.94)))
+            if is_multi_customer:
+                ops.append(_text_line(688, 'STATEMENT TYPE:', 7.5, 68, bold=True, r=0.39, g=0.45, b=0.55))
+                ops.append(_text_line(674, f'Consolidated Ledger ({distinct_count} Accounts)', 10.5, 68, bold=True, r=0.06, g=0.09, b=0.16))
+                ops.append(_text_line(660, 'Combined transaction ledger across multiple customer accounts & walk-ins', 7.5, 68, r=0.39, g=0.45, b=0.55))
+            else:
+                ops.append(_text_line(688, 'ACCOUNT FOR:', 7.5, 68, bold=True, r=0.39, g=0.45, b=0.55))
+                ops.append(_text_line(674, customer_name, 11, 68, bold=True, r=0.06, g=0.09, b=0.16))
+                c_meta = f'Phone: {customer_phone}' if customer_phone else ''
+                if customer_address:
+                    c_meta += f'  |  {customer_address}' if c_meta else customer_address
+                if c_meta:
+                    ops.append(_text_line(660, c_meta[:50], 8, 68, r=0.39, g=0.45, b=0.55))
+
+            ops.append(_text_line(688, 'STATEMENT CRITERIA:', 7.5, 340, bold=True, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(674, f'{filter_label}', 9.5, 340, bold=True, r=0.06, g=0.46, b=0.43))
+            ops.append(_text_line(660, f'Generated: {generated}', 8, 340, r=0.39, g=0.45, b=0.55))
+
+            # ── KPI Cards ──
+            kpis = [
+                ('Total Invoiced', f'BDT {total_billed:.2f}', (0.06, 0.46, 0.43)),
+                ('Total Paid', f'BDT {total_paid:.2f}', (0.02, 0.37, 0.27)),
+                ('Outstanding Due', f'BDT {total_due:.2f}', (0.60, 0.11, 0.11) if total_due > 0 else (0.06, 0.46, 0.43)),
             ]
+            ops.extend(_render_kpi_cards(596, kpis, h=44))
+
+            curr_y = 580
+            # ── Table Header Bar ──
+            ops.append(_rect_fill(54, curr_y - 4, 504, 20, r=0.06, g=0.09, b=0.16))
+            if is_multi_customer:
+                ops.append(_text_line(curr_y + 2, 'DATE', 7.5, 60, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'INVOICE', 7.5, 118, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'CUSTOMER', 7.5, 175, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'PRODUCT', 7.5, 262, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 2, 'QTY', 7.5, 375, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 2, 'PRICE (BDT)', 7.5, 435, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 7.5, 495, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'STATUS', 7.5, 514, bold=True, r=1.0, g=1.0, b=1.0))
+            else:
+                ops.append(_text_line(curr_y + 2, 'DATE', 8, 64, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'INVOICE', 8, 135, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'PRODUCT DESCRIPTION', 8, 195, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 2, 'QTY', 8, 360, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 2, 'PRICE (BDT)', 8, 430, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 8, 495, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'STATUS', 8, 516, bold=True, r=1.0, g=1.0, b=1.0))
         else:
-            ops.append(_text_line(668, f'... continued (page {page_no})', 9))
+            header_title = f'Mtronix Consolidated Statement (Page {page_no})' if is_multi_customer else f'Mtronix Customer Statement - {customer_name} (Page {page_no})'
+            ops.append(_text_line(760, header_title, 9, 54, bold=True, r=0.39, g=0.45, b=0.55))
+            ops.append(_line(54, 750, 558, 750, r=0.88, g=0.91, b=0.94, width=0.75))
+            curr_y = 732
+            ops.append(_rect_fill(54, curr_y - 4, 504, 18, r=0.06, g=0.09, b=0.16))
+            if is_multi_customer:
+                ops.append(_text_line(curr_y + 1, 'DATE', 7.5, 60, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'INVOICE', 7.5, 118, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'CUSTOMER', 7.5, 175, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'PRODUCT', 7.5, 262, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 1, 'QTY', 7.5, 375, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 1, 'PRICE (BDT)', 7.5, 435, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 7.5, 495, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'STATUS', 7.5, 514, bold=True, r=1.0, g=1.0, b=1.0))
+            else:
+                ops.append(_text_line(curr_y + 1, 'DATE', 8, 64, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'INVOICE', 8, 135, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'PRODUCT DESCRIPTION', 8, 195, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 1, 'QTY', 8, 360, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 1, 'PRICE (BDT)', 8, 430, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 8, 495, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'STATUS', 8, 516, bold=True, r=1.0, g=1.0, b=1.0))
+
         return ops
 
     def footer(page_no: int, is_last: bool) -> List[str]:
-        return _make_footer_ops(page_no, is_last, qr_matrix, qr_cell, footer_text_ops)
+        return _make_footer_ops(page_no, is_last)
 
     builder = PdfBuilder()
     pc = PageComposer(builder, header_fn=header, footer_fn=footer)
 
-    # ── Top Selling Products ─────────────────────────────────────────────────
-    pc.ensure(60)
-    pc.add_line('Top Selling Products (by Quantity)', 13, bold=True)
-    pc.skip(4)
+    if not items:
+        pc.ensure(40)
+        pc.add_line('No transaction records found for the selected criteria.', 10, r=0.39, g=0.45, b=0.55)
+    else:
+        for idx, it in enumerate(items):
+            pc.ensure(18)
+            y = pc.y
+            if idx % 2 == 1:
+                pc._streams.append(_rect_fill(54, y - 4, 504, 18, 0.975, 0.985, 0.995))
+            pc._streams.append(_line(54, y - 4, 558, y - 4, 0.90, 0.92, 0.95, 0.5))
+
+            date_str = _sanitize_text(it.get('date', '-'))
+            inv_str = _sanitize_text(it.get('sale_code', f"#{it.get('sale_id', '')}"))
+            cust_str = _sanitize_text(str(it.get('customer_name', 'Walk-in'))[:14])
+            prod_str = _sanitize_text(str(it.get('product_name', ''))[:(14 if is_multi_customer else 22)])
+            qty_str = str(it.get('quantity', 0))
+            price_str = f"{float(it.get('unit_price', 0)):.2f}"
+            total_str = f"{float(it.get('total_amount', 0)):.2f}"
+            st_raw = str(it.get('status', 'PAID')).upper()
+
+            if is_multi_customer:
+                pc._streams.append(_text_line(y, date_str, 7.5, 60, r=0.28, g=0.33, b=0.41))
+                pc._streams.append(_text_line(y, inv_str, 7.5, 118, bold=True, r=0.06, g=0.46, b=0.43))
+                pc._streams.append(_text_line(y, cust_str, 7.5, 175, bold=True, r=0.15, g=0.20, b=0.30))
+                pc._streams.append(_text_line(y, prod_str, 7.5, 262, bold=True, r=0.06, g=0.09, b=0.16))
+                pc._streams.append(_text_right(y, qty_str, 7.5, 375, r=0.06, g=0.09, b=0.16))
+                pc._streams.append(_text_right(y, price_str, 7.5, 435, r=0.06, g=0.09, b=0.16))
+                pc._streams.append(_text_right(y, total_str, 7.5, 495, bold=True, r=0.06, g=0.09, b=0.16))
+                badge_x = 512
+            else:
+                pc._streams.append(_text_line(y, date_str, 8, 64, r=0.28, g=0.33, b=0.41))
+                pc._streams.append(_text_line(y, inv_str, 8, 135, bold=True, r=0.06, g=0.46, b=0.43))
+                pc._streams.append(_text_line(y, prod_str, 8.5, 195, bold=True, r=0.06, g=0.09, b=0.16))
+                pc._streams.append(_text_right(y, qty_str, 8.5, 360, r=0.06, g=0.09, b=0.16))
+                pc._streams.append(_text_right(y, price_str, 8.5, 430, r=0.06, g=0.09, b=0.16))
+                pc._streams.append(_text_right(y, total_str, 8.5, 495, bold=True, r=0.06, g=0.09, b=0.16))
+                badge_x = 510
+
+            if st_raw == 'PAID':
+                pc._streams.append(_badge(badge_x, y - 2, 'PAID', bg=(0.82, 0.98, 0.90), fg=(0.02, 0.37, 0.27), w=(40 if is_multi_customer else 44), h=13, size=6.5))
+            elif st_raw == 'PARTIAL':
+                pc._streams.append(_badge(badge_x, y - 2, 'PARTIAL', bg=(0.99, 0.95, 0.78), fg=(0.57, 0.25, 0.05), w=(40 if is_multi_customer else 44), h=13, size=6.5))
+            else:
+                pc._streams.append(_badge(badge_x, y - 2, 'UNPAID', bg=(0.99, 0.89, 0.89), fg=(0.60, 0.11, 0.11), w=(40 if is_multi_customer else 44), h=13, size=6.5))
+
+            pc.skip(18)
+
+    # ── Summary Box at End ──
+    pc.ensure(90)
+    pc.skip(10)
+    y = pc.y
+    box_w = 230.0
+    box_x = 558.0 - box_w
+    box_h = 70.0
+
+    pc._streams.append(_rect_card(box_x, y - box_h, box_w, box_h, bg=(0.98, 0.985, 0.995), border=(0.85, 0.88, 0.92)))
+    pc._streams.append(_text_line(y - 18, 'TOTAL BILLED:', 9, box_x + 14, bold=True, r=0.39, g=0.45, b=0.55))
+    pc._streams.append(_text_line(y - 18, f'BDT {total_billed:.2f}', 10.5, box_x + 120, bold=True, r=0.06, g=0.09, b=0.16))
+
+    pc._streams.append(_text_line(y - 34, 'TOTAL PAID:', 9, box_x + 14, bold=True, r=0.39, g=0.45, b=0.55))
+    pc._streams.append(_text_line(y - 34, f'BDT {total_paid:.2f}', 10.5, box_x + 120, bold=True, r=0.02, g=0.37, b=0.27))
+
+    pc._streams.append(_line(box_x + 10, y - 44, box_x + box_w - 10, y - 44, 0.88, 0.91, 0.94, 0.5))
+    pc._streams.append(_text_line(y - 60, 'BALANCE DUE:', 9.5, box_x + 14, bold=True, r=0.60, g=0.11, b=0.11))
+    pc._streams.append(_text_line(y - 60, f'BDT {total_due:.2f}', 12, box_x + 120, bold=True, r=0.60, g=0.11, b=0.11))
+
+    pc.skip(box_h + 16)
+    pc.finish()
+    return builder.build()
+
+
+# ── 3. Sales Summary Report PDF ──────────────────────────────────────────────
+def build_sales_report_pdf(report_data: dict[str, Any]) -> bytes:
+    """Generate executive sales summary report PDF."""
+    qr_matrix = _build_qr_matrix(MAPS_URL)
+    qr_cell = 1.05
+
+    raw_dt = report_data.get('generated_at')
+    if isinstance(raw_dt, datetime.datetime):
+        generated = _bd_time(raw_dt)
+    elif isinstance(raw_dt, str) and raw_dt:
+        generated = raw_dt
+    else:
+        generated = _bd_now()
+
+    tot_rev = float(report_data.get("total_revenue", 0))
+    tot_paid = float(report_data.get("total_paid", 0))
+    tot_due = float(report_data.get("total_due", 0))
+    items_sold = int(report_data.get("total_items_sold", 0))
+
+    def header(page_no: int) -> List[str]:
+        ops = []
+        if page_no == 1:
+            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.06, g=0.09, b=0.16))
+            ops.append(_text_line(748, 'SALES SUMMARY & PERFORMANCE REPORT', 8.5, 54, bold=True, r=0.06, g=0.46, b=0.43))
+            ops.append(_text_line(735, f'Period: {report_data["period_label"]}  |  Generated: {generated}', 8, 54, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(723, f'Address: {MTRONIX_ADDRESS}', 8, 54, r=0.39, g=0.45, b=0.55))
+
+            if qr_matrix:
+                qr_size = len(qr_matrix) * qr_cell
+                card_w = qr_size + 14
+                card_h = qr_size + 20
+                card_x = 558 - card_w
+                card_y = 712
+                qr_x = card_x + 7
+                qr_y = card_y + 4
+                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(0.98, 0.99, 1.0), border=(0.85, 0.88, 0.92)))
+                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.39, g=0.45, b=0.55))
+                ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y, qr_cell))
+
+            ops.append(_line(54, 710, 558, 710, r=0.06, g=0.09, b=0.16, width=1.5))
+
+            kpis = [
+                ('Total Revenue', f'BDT {tot_rev:.2f}', (0.06, 0.46, 0.43)),
+                ('Total Paid', f'BDT {tot_paid:.2f}', (0.02, 0.37, 0.27)),
+                ('Outstanding Due', f'BDT {tot_due:.2f}', (0.60, 0.11, 0.11) if tot_due > 0 else (0.06, 0.46, 0.43)),
+                ('Items Sold', str(items_sold), (0.06, 0.09, 0.16)),
+            ]
+            ops.extend(_render_kpi_cards(656, kpis, h=44))
+        else:
+            ops.append(_text_line(760, f'Mtronix Sales Summary Report (Page {page_no})', 9, 54, bold=True, r=0.39, g=0.45, b=0.55))
+            ops.append(_line(54, 750, 558, 750, r=0.88, g=0.91, b=0.94, width=0.75))
+
+        return ops
+
+    def footer(page_no: int, is_last: bool) -> List[str]:
+        return _make_footer_ops(page_no, is_last)
+
+    builder = PdfBuilder()
+    pc = PageComposer(builder, header_fn=header, footer_fn=footer)
+
+    # ── Top Selling Products ──
+    pc.ensure(80)
+    pc.add_line('Top Selling Products (by Quantity)', 12, bold=True, r=0.06, g=0.09, b=0.16)
+    pc.skip(6)
 
     top_selling = report_data.get('top_selling') or []
     if not top_selling:
-        pc.add_line('No sales recorded in this period.', 11)
+        pc.add_line('No sales recorded in this period.', 9.5, r=0.39, g=0.45, b=0.55)
     else:
         for idx, item in enumerate(top_selling[:5], 1):
             sku_suffix = f' ({item["product__sku"]})' if item.get("product__sku") else ''
-            line = (
-                f'{idx}. {item["product__name"]}{sku_suffix}'
-                f'  —  {item["total_qty"]} sold  |  BDT {item["total_sales"]:.2f}'
-            )
-            pc.add_line(line, 11)
+            pname = _sanitize_text(f'{idx}. {item["product__name"]}{sku_suffix}')
+            line = f'{pname}   *   {item["total_qty"]} sold   |   BDT {item["total_sales"]:.2f}'
+            pc.add_line(line, 9.5, r=0.06, g=0.09, b=0.16)
 
+    pc.skip(10)
+    pc.add_divider()
     pc.skip(8)
-    pc.add_divider()
-    pc.skip(6)
 
-    # ── Product Sales Breakdown ──────────────────────────────────────────────
-    pc.ensure(60)
-    pc.add_line('Product Sales Breakdown', 13, bold=True)
-    pc.skip(4)
+    # ── Product Sales Breakdown ──
+    pc.ensure(80)
+    pc.add_line('Product Sales Breakdown', 12, bold=True, r=0.06, g=0.09, b=0.16)
+    pc.skip(8)
 
-    # Column headers
     y = pc.y
-    pc._streams.append(_text_line(y, 'Product Name',  11,  72, bold=True))
-    pc._streams.append(_text_line(y, 'SKU',           11, 270, bold=True))
-    pc._streams.append(_text_line(y, 'Qty Sold',      11, 360, bold=True))
-    pc._streams.append(_text_line(y, 'Total (BDT)',   11, 450, bold=True))
-    pc.skip(16)
-    pc.add_divider()
-    pc.skip(4)
+    pc._streams.append(_rect_fill(54, y - 4, 504, 20, r=0.06, g=0.09, b=0.16))
+    pc._streams.append(_text_line(y + 2, 'PRODUCT NAME', 8.5, 66, bold=True, r=1.0, g=1.0, b=1.0))
+    pc._streams.append(_text_line(y + 2, 'SKU', 8.5, 270, bold=True, r=1.0, g=1.0, b=1.0))
+    pc._streams.append(_text_right(y + 2, 'QTY SOLD', 8.5, 390, bold=True, r=1.0, g=1.0, b=1.0))
+    pc._streams.append(_text_right(y + 2, 'TOTAL SALES (BDT)', 8.5, 550, bold=True, r=1.0, g=1.0, b=1.0))
+    pc.skip(20)
 
     product_sales = report_data.get('product_sales') or []
     if not product_sales:
-        pc.add_line('No product breakdown available.', 11)
+        pc.add_line('No product breakdown available.', 9.5, r=0.39, g=0.45, b=0.55)
     else:
-        for item in product_sales:
-            pc.ensure(20)
+        for idx, item in enumerate(product_sales):
+            pc.ensure(18)
             y = pc.y
+            if idx % 2 == 1:
+                pc._streams.append(_rect_fill(54, y - 4, 504, 18, 0.975, 0.985, 0.995))
+            pc._streams.append(_line(54, y - 4, 558, y - 4, 0.90, 0.92, 0.95, 0.5))
 
-            # Place all column text at the same Y position (single row)
-            pc._streams.append(_text_line(y, item['product__name'],                 10,  72))
-            pc._streams.append(_text_line(y, item.get('product__sku') or '—',       10, 270))
-            pc._streams.append(_text_line(y, str(item['total_qty']),                10, 360))
-            pc._streams.append(_text_line(y, f"{item['total_sales']:.2f}",          10, 450))
-
-            # Advance Y position for next row
+            pc._streams.append(_text_line(y, _sanitize_text(item['product__name'])[:30], 9, 66, bold=True, r=0.06, g=0.09, b=0.16))
+            pc._streams.append(_text_line(y, _sanitize_text(item.get('product__sku') or '-'), 8.5, 270, r=0.39, g=0.45, b=0.55))
+            pc._streams.append(_text_right(y, str(item['total_qty']), 9, 390, r=0.06, g=0.09, b=0.16))
+            pc._streams.append(_text_right(y, f"{item['total_sales']:.2f}", 9.5, 550, bold=True, r=0.06, g=0.09, b=0.16))
             pc.skip(18)
 
     pc.finish()

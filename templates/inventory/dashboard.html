@@ -1,85 +1,314 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard - Mtronix{% endblock %}
-{% block page_title %}Mtronix Inventory Dashboard{% endblock %}
-{% block page_subtitle %}Products, stock levels, purchases, and sales at a glance.{% endblock %}
+{% block title %}Dashboard - Mtronix Electronics POS & Inventory{% endblock %}
+{% block page_title %}Executive Dashboard{% endblock %}
+{% block page_subtitle %}Real-time store performance, financial metrics, and inventory overview.{% endblock %}
 
 {% block header_action %}
-<a class="button primary" href="{% url 'sales:create' %}">New Sale</a>
+<div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <a class="button" href="{% url 'sales:customer_statement' %}" style="background: var(--surface); border: 1px solid var(--border); font-weight: 500;">
+        📄 Statements & Due
+    </a>
+    <a class="button" href="{% url 'sales:report_pdf' %}?period={{ period }}" target="_blank" style="background: var(--surface); border: 1px solid var(--border); font-weight: 500;">
+        🖨 Sales Report PDF
+    </a>
+    <a class="button primary" href="{% url 'sales:create' %}" style="font-weight: 600; box-shadow: 0 2px 8px rgba(13,148,136,0.25);">
+        ⚡ New Sale (POS)
+    </a>
+</div>
 {% endblock %}
 
 {% block content %}
-<section class="metrics">
-    <article class="metric-card">
-        <span>Total Products</span>
-        <strong>{{ total_products }}</strong>
+<!-- ── Period Selector Filter Tabs ── -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div style="display: inline-flex; background: var(--surface-2); padding: 4px; border-radius: 8px; border: 1px solid var(--border); gap: 4px;">
+        <a href="?period=today" class="button" style="padding: 6px 14px; font-size: 12.5px; height: auto; border: none; border-radius: 6px; {% if period == 'today' %}background: var(--primary); color: #fff; font-weight: 600;{% else %}background: transparent; color: var(--muted);{% endif %}">
+            Today
+        </a>
+        <a href="?period=week" class="button" style="padding: 6px 14px; font-size: 12.5px; height: auto; border: none; border-radius: 6px; {% if period == 'week' %}background: var(--primary); color: #fff; font-weight: 600;{% else %}background: transparent; color: var(--muted);{% endif %}">
+            This Week
+        </a>
+        <a href="?period=month" class="button" style="padding: 6px 14px; font-size: 12.5px; height: auto; border: none; border-radius: 6px; {% if period == 'month' %}background: var(--primary); color: #fff; font-weight: 600;{% else %}background: transparent; color: var(--muted);{% endif %}">
+            This Month
+        </a>
+        <a href="?period=year" class="button" style="padding: 6px 14px; font-size: 12.5px; height: auto; border: none; border-radius: 6px; {% if period == 'year' %}background: var(--primary); color: #fff; font-weight: 600;{% else %}background: transparent; color: var(--muted);{% endif %}">
+            This Year
+        </a>
+        <a href="?period=all" class="button" style="padding: 6px 14px; font-size: 12.5px; height: auto; border: none; border-radius: 6px; {% if period == 'all' %}background: var(--primary); color: #fff; font-weight: 600;{% else %}background: transparent; color: var(--muted);{% endif %}">
+            All Time
+        </a>
+    </div>
+
+    <div style="font-size: 12.5px; color: var(--muted); background: var(--surface); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);">
+        📅 <strong>{{ period_label }}</strong>
+    </div>
+</div>
+
+<!-- ── Primary KPI Metrics Cards ── -->
+<section class="metrics" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <!-- 1. Revenue in Period -->
+    <article class="metric-card" style="background: linear-gradient(135deg, var(--surface) 0%, rgba(13,148,136,0.04) 100%); border-left: 4px solid var(--primary); padding: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);">Sales Revenue</span>
+            <span style="font-size: 18px;">💰</span>
+        </div>
+        <strong style="font-size: 24px; color: var(--text); display: block; margin: 8px 0 4px;">BDT {{ period_revenue|floatformat:2 }}</strong>
+        <div style="font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap;">
+            <span style="color: #059669; font-weight: 600;">✓ Paid: BDT {{ period_paid|floatformat:2 }}</span>
+            {% if period_due > 0 %}
+            <span style="color: #d97706; font-weight: 600;">🌓 Due: BDT {{ period_due|floatformat:2 }}</span>
+            {% endif %}
+        </div>
     </article>
-    <article class="metric-card">
-        <span>Inventory Items</span>
-        <strong>{{ current_inventory|length }}</strong>
+
+    <!-- 2. Sales Transactions & Units Sold -->
+    <article class="metric-card" style="background: linear-gradient(135deg, var(--surface) 0%, rgba(37,99,235,0.04) 100%); border-left: 4px solid #2563eb; padding: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);">Sales Activity</span>
+            <span style="font-size: 18px;">🧾</span>
+        </div>
+        <strong style="font-size: 24px; color: var(--text); display: block; margin: 8px 0 4px;">{{ period_tx_count }} <span style="font-size: 14px; font-weight: normal; color: var(--muted);">Orders</span></strong>
+        <div style="font-size: 12px; color: var(--muted);">
+            <span>📦 <strong>{{ period_units_sold }}</strong> units sold in period</span>
+        </div>
     </article>
-    <article class="metric-card warning">
-        <span>Low Stock Alerts</span>
-        <strong>{{ low_stock|length }}</strong>
+
+    <!-- 3. Store-wide Outstanding Due (Receivables) -->
+    <article class="metric-card" style="background: linear-gradient(135deg, var(--surface) 0%, rgba(220,38,38,0.04) 100%); border-left: 4px solid {% if store_total_due > 0 %}#dc2626{% else %}#059669{% endif %}; padding: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);">Total Store Due</span>
+            <span style="font-size: 18px;">⏳</span>
+        </div>
+        <strong style="font-size: 24px; color: {% if store_total_due > 0 %}#dc2626{% else %}#059669{% endif %}; display: block; margin: 8px 0 4px;">
+            BDT {{ store_total_due|floatformat:2 }}
+        </strong>
+        <div style="font-size: 12px; color: var(--muted); display: flex; justify-content: space-between;">
+            <span>Uncollected balance</span>
+            <a href="{% url 'sales:customer_statement' %}?status=unpaid" style="color: var(--primary); font-weight: 600; text-decoration: none;">View Due List &rarr;</a>
+        </div>
+    </article>
+
+    <!-- 4. Total Products & Stock Units -->
+    <article class="metric-card" style="background: linear-gradient(135deg, var(--surface) 0%, rgba(79,70,229,0.04) 100%); border-left: 4px solid #4f46e5; padding: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);">Inventory Asset Value</span>
+            <span style="font-size: 18px;">📦</span>
+        </div>
+        <strong style="font-size: 24px; color: var(--text); display: block; margin: 8px 0 4px;">BDT {{ inventory_value_retail|floatformat:2 }}</strong>
+        <div style="font-size: 12px; color: var(--muted);">
+            <span>{{ total_products }} Products &bull; <strong>{{ total_stock_units }}</strong> units in stock</span>
+        </div>
     </article>
 </section>
 
-<section class="panel">
-    <div class="panel-head">
-        <h2>Current Inventory</h2>
-        <a class="button" href="{% url 'inventory:list' %}">View All</a>
+<!-- ── Low Stock Alert Banner ── -->
+{% if low_stock_count > 0 %}
+<div class="panel" style="background: #fffbeb; border: 1px solid #fde68a; margin-bottom: 24px; padding: 16px 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 24px;">⚠️</span>
+            <div>
+                <strong style="color: #92400e; font-size: 14.5px;">Attention: {{ low_stock_count }} item{% if low_stock_count > 1 %}s are{% else %} is{% endif %} at or below low stock threshold!</strong>
+                <p style="margin: 2px 0 0; font-size: 12.5px; color: #b45309;">
+                    {% if out_of_stock_count > 0 %}<strong style="color: #dc2626;">{{ out_of_stock_count }} item(s) completely out of stock!</strong> &bull; {% endif %}
+                    Review inventory levels and restock items to avoid sales disruption.
+                </p>
+            </div>
+        </div>
+        <a class="button" href="{% url 'inventory:list' %}" style="background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; font-weight: 600; font-size: 12.5px;">
+            Manage Low Stock
+        </a>
     </div>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr><th>Product</th><th>SKU</th><th>Quantity</th><th>Low Stock At</th></tr>
-            </thead>
-            <tbody>
-                {% for item in current_inventory %}
-                <tr>
-                    <td>{{ item.product.name }}</td>
-                    <td>{{ item.product.sku|default:"—" }}</td>
-                    <td><span class="badge">{{ item.quantity }}</span></td>
-                    <td>{{ item.product.low_stock_threshold }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="4">No inventory yet.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+</div>
+{% endif %}
 
-<section class="three-column">
-    <article class="panel">
-        <h2>Low Stock</h2>
-        <ul class="simple-list">
-            {% for item in low_stock %}
-            <li><span>{{ item.product.name }}</span><strong>{{ item.quantity }}</strong></li>
-            {% empty %}
-            <li>No low stock items.</li>
-            {% endfor %}
-        </ul>
-    </article>
-    <article class="panel">
-        <h2>Recent Sales</h2>
-        <ul class="simple-list">
-            {% for sale in recent_sales %}
-            <li><span>{{ sale.product.name }}</span><strong>{{ sale.quantity }}</strong></li>
-            {% empty %}
-            <li>No sales yet.</li>
-            {% endfor %}
-        </ul>
-    </article>
-    <article class="panel">
-        <h2>Recent Purchases</h2>
-        <ul class="simple-list">
-            {% for purchase in recent_purchases %}
-            <li><span>{{ purchase.product.name }}</span><strong>{{ purchase.quantity }}</strong></li>
-            {% empty %}
-            <li>No purchases yet.</li>
-            {% endfor %}
-        </ul>
-    </article>
-</section>
+<!-- ── Main 2-Column Grid: Recent Sales & Top Products / Inventory ── -->
+<div style="display: grid; grid-template-columns: 1fr; gap: 24px;">
+
+    <!-- Recent Sales Panel -->
+    <section class="panel" style="margin-bottom: 0;">
+        <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2>Recent Sales & Invoices</h2>
+                <span style="font-size: 12.5px; color: var(--muted);">Latest transactions with payment and due tracking</span>
+            </div>
+            <a class="button" href="{% url 'sales:list' %}">View All Sales ({{ store_total_revenue|floatformat:0 }} BDT Total)</a>
+        </div>
+        
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sale ID</th>
+                        <th>Customer</th>
+                        <th>Date & Time</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in recent_sales %}
+                    <tr>
+                        <td>
+                            <strong style="font-family: monospace; font-size: 13px; color: var(--primary);">#{{ sale.pk|stringformat:"05d" }}</strong>
+                        </td>
+                        <td>
+                            <div>
+                                <strong style="font-size: 13px;">{{ sale.customer_name|default:"Walk-in Customer" }}</strong>
+                                {% if sale.customer_phone %}
+                                <div style="font-size: 11.5px; color: var(--muted);">📞 {{ sale.customer_phone }}</div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td style="font-size: 12.5px; white-space: nowrap; color: var(--muted);">
+                            {{ sale.sold_at|date:"M d, Y" }}<br>
+                            <span style="font-size: 11px;">{{ sale.sold_at|date:"h:i A" }}</span>
+                        </td>
+                        <td>
+                            <span style="font-size: 12px; color: var(--muted);">
+                                {% for item in sale.items.all %}
+                                    {{ item.display_name }} (x{{ item.quantity }}){% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </span>
+                        </td>
+                        <td>
+                            <strong style="font-size: 13.5px;">BDT {{ sale.total_amount|floatformat:2 }}</strong>
+                        </td>
+                        <td>
+                            {% if sale.is_paid %}
+                            <span class="badge" style="background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 700; font-size: 11px;">
+                                ✓ PAID
+                            </span>
+                            {% elif sale.is_partial %}
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 11px;">
+                                    🌓 PARTIAL
+                                </span>
+                                <span style="font-size: 10.5px; color: #991b1b; font-weight: 600;">Due: {{ sale.due_amount|floatformat:2 }}</span>
+                            </div>
+                            {% else %}
+                            <span class="badge" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; font-size: 11px;">
+                                ✕ UNPAID
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; white-space: nowrap;">
+                            <a class="button" href="{% url 'sales:receipt_print' sale.pk %}" target="_blank" style="padding: 4px 8px; font-size: 11.5px; height: auto;" title="View Thermal Receipt">
+                                🧾 Receipt
+                            </a>
+                            <a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" style="padding: 4px 8px; font-size: 11.5px; height: auto;" title="Download PDF">
+                                🖨 PDF
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 30px; color: var(--muted);">
+                            No sales recorded yet. <a href="{% url 'sales:create' %}" style="color: var(--primary); font-weight: 600;">Create your first sale &rarr;</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Two-column: Top Selling Products & Stock Health -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px;">
+        
+        <!-- Top Selling Items in Selected Period -->
+        <article class="panel" style="margin-bottom: 0;">
+            <div class="panel-head">
+                <h2>Top Selling Products ({{ period_label }})</h2>
+            </div>
+            {% if top_selling %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Product</th>
+                            <th style="text-align: right;">Qty Sold</th>
+                            <th style="text-align: right;">Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in top_selling %}
+                        <tr>
+                            <td style="font-weight: 700; color: var(--primary); font-size: 13px;">#{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ item.resolved_name }}</strong>
+                                {% if item.resolved_sku and item.resolved_sku != '—' %}
+                                <div style="font-size: 11px; color: var(--muted);">SKU: {{ item.resolved_sku }}</div>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: right; font-weight: 700;">{{ item.total_qty }}</td>
+                            <td style="text-align: right; font-weight: 600; color: #059669;">BDT {{ item.total_sales|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div style="padding: 24px; text-align: center; color: var(--muted); font-size: 13px;">
+                No product sales recorded in this period.
+            </div>
+            {% endif %}
+        </article>
+
+        <!-- Current Inventory Snapshot & Low Stock Warnings -->
+        <article class="panel" style="margin-bottom: 0;">
+            <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Inventory Snapshot</h2>
+                <a class="button" href="{% url 'inventory:list' %}" style="font-size: 12px; padding: 4px 10px; height: auto;">View Inventory</a>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Price</th>
+                            <th style="text-align: right;">Stock</th>
+                            <th style="text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in current_inventory %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.product.name }}</strong>
+                                {% if item.product.group %}
+                                <span style="font-size: 10.5px; background: #eff6ff; color: #2563eb; padding: 1px 5px; border-radius: 4px; margin-left: 4px;">{{ item.product.group.name }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="font-size: 12px;">BDT {{ item.product.selling_price }}</td>
+                            <td style="text-align: right;">
+                                {% if item.quantity == 0 %}
+                                <span class="badge" style="background: #fee2e2; color: #991b1b; font-weight: 700; font-size: 11px;">0 (Out)</span>
+                                {% elif item.quantity <= item.product.low_stock_threshold %}
+                                <span class="badge" style="background: #fffbeb; color: #b45309; font-weight: 700; font-size: 11px;">{{ item.quantity }} (Low)</span>
+                                {% else %}
+                                <span class="badge" style="background: #d1fae5; color: #065f46; font-weight: 700; font-size: 11px;">{{ item.quantity }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: right;">
+                                <a class="button" href="{% url 'inventory:add_stock' item.pk %}" style="padding: 3px 8px; font-size: 11.5px; height: auto;" title="Add Stock">
+                                    + Stock
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 20px; color: var(--muted);">No inventory items found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+    </div>
+</div>
 {% endblock %}

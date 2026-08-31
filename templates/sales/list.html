@@ -2,10 +2,30 @@
 
 {% block title %}Sales - Mtronix{% endblock %}
 {% block page_title %}Sales{% endblock %}
-{% block page_subtitle %}Record outgoing stock and customer sales.{% endblock %}
+{% block page_subtitle %}Manage customer transactions, track paid/unpaid status, and print statements.{% endblock %}
 {% block header_action %}<a class="button primary" href="{% url 'sales:create' %}">New Sale</a>{% endblock %}
 
 {% block content %}
+<!-- Metrics Summary -->
+<section class="metrics" style="margin-bottom: 20px;">
+    <article class="metric-card">
+        <span>Total Sales</span>
+        <strong>{{ total_count }}</strong>
+    </article>
+    <article class="metric-card">
+        <span>Total Revenue</span>
+        <strong>BDT {{ total_revenue|floatformat:2 }}</strong>
+    </article>
+    <article class="metric-card" style="border-left: 4px solid #10b981;">
+        <span style="color: #065f46;">Total Paid</span>
+        <strong style="color: #059669;">BDT {{ total_paid|floatformat:2 }}</strong>
+    </article>
+    <article class="metric-card warning">
+        <span>Outstanding Due</span>
+        <strong>BDT {{ total_unpaid|floatformat:2 }}</strong>
+    </article>
+</section>
+
 {% if receipt_sale %}
 <section class="panel" style="margin-bottom: 16px; border-color: #a7f3d0; background: #ecfdf5;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
@@ -20,22 +40,41 @@
 {% endif %}
 
 <section class="panel">
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-        <!-- Search Form -->
-        <form method="get" style="display: flex; gap: 8px; flex: 1; min-width: 320px;">
-            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search by Sale ID (e.g. 55 or SALE-00055), customer, or product..." style="flex: 1; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit;">
-            <button class="button primary" type="submit">Search</button>
-            {% if query %}
-            <a class="button" href="{% url 'sales:list' %}">Clear</a>
-            {% endif %}
-        </form>
-        
-        <!-- PDF Reports -->
-        <div class="actions" style="display: flex; gap: 8px; align-items: center;">
-            <span style="color: var(--muted); font-size: 14px; font-weight: bold;">Print Sales Report:</span>
+    <!-- Filter & Search Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 18px; flex-wrap: wrap;">
+        <!-- Status Filter Tabs -->
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--muted); margin-right: 4px;">Status:</span>
+            <a href="?q={{ query|default:'' }}&status=all" class="button {% if status_filter == 'all' or not status_filter %}primary{% endif %}" style="padding: 5px 12px; font-size: 12.5px;">All</a>
+            <a href="?q={{ query|default:'' }}&status=paid" class="button {% if status_filter == 'paid' %}primary{% endif %}" style="padding: 5px 12px; font-size: 12.5px;">✓ Paid</a>
+            <a href="?q={{ query|default:'' }}&status=partial" class="button {% if status_filter == 'partial' %}primary{% endif %}" style="padding: 5px 12px; font-size: 12.5px;">🌓 Partial / Due</a>
+            <a href="?q={{ query|default:'' }}&status=unpaid" class="button {% if status_filter == 'unpaid' %}primary{% endif %}" style="padding: 5px 12px; font-size: 12.5px;">⏳ Unpaid</a>
+        </div>
+
+        <!-- PDF Reports & Bulk Print -->
+        <div class="actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span style="color: var(--muted); font-size: 13px; font-weight: 600;">Periodic Reports:</span>
             <a class="button" href="{% url 'sales:report_pdf' %}?period=today" target="_blank">Today</a>
             <a class="button" href="{% url 'sales:report_pdf' %}?period=month" target="_blank">This Month</a>
             <a class="button" href="{% url 'sales:report_pdf' %}?period=year" target="_blank">This Year</a>
+        </div>
+    </div>
+
+    <!-- Search + Batch Action Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
+        <form method="get" style="display: flex; gap: 8px; flex: 1; min-width: 280px;">
+            <input type="hidden" name="status" value="{{ status_filter|default:'all' }}">
+            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search customer name, phone, address, sale ID, or product..." style="flex: 1; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 13px;">
+            <button class="button primary" type="submit">Search</button>
+            {% if query %}
+            <a class="button" href="{% url 'sales:list' %}?status={{ status_filter|default:'all' }}">Clear</a>
+            {% endif %}
+        </form>
+
+        <div id="batch-actions" style="display: none; align-items: center; gap: 8px; background: #f0fdf4; padding: 6px 12px; border-radius: 8px; border: 1px solid #bbf7d0;">
+            <span id="selected-count" style="font-size: 12.5px; font-weight: 600; color: #065f46;">0 selected</span>
+            <button type="button" class="button primary" onclick="printSelectedStatement()" style="padding: 5px 12px; font-size: 12px;">📄 Print Selected Statement</button>
+            <button type="button" class="button" onclick="viewSelectedStatement()" style="padding: 5px 12px; font-size: 12px;">View Statement</button>
         </div>
     </div>
 
@@ -43,38 +82,91 @@
         <table>
             <thead>
                 <tr>
+                    <th style="width: 36px; text-align: center;">
+                        <input type="checkbox" id="select-all" title="Select all" style="cursor: pointer;">
+                    </th>
                     <th>Sale ID</th>
-                    <th>Customer</th>
+                    <th>Customer Details</th>
                     <th>Date</th>
                     <th>Products Sold</th>
-                    <th>Total Amount</th>
-                    <th>Actions</th>
+                    <th>Total</th>
+                    <th>Payment Status</th>
+                    <th style="text-align: right;">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for sale in sales %}
                 <tr>
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="sale-checkbox" value="{{ sale.pk }}" style="cursor: pointer;">
+                    </td>
                     <td><strong>SALE-{{ sale.pk|stringformat:"05d" }}</strong></td>
-                    <td>{{ sale.customer_name|default:'Walk-in' }}</td>
-                    <td>{{ sale.sold_at|date:"M d, Y h:i A" }}</td>
                     <td>
-                        <span style="font-size: 13px; color: var(--muted);">
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <strong>{{ sale.customer_name|default:'Walk-in Customer' }}</strong>
+                            {% if sale.customer_phone %}
+                            <span style="font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace;">📞 {{ sale.customer_phone }}</span>
+                            {% endif %}
+                            {% if sale.customer_address %}
+                            <span style="font-size: 11.5px; color: var(--muted);">📍 {{ sale.customer_address }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="font-size: 12.5px; white-space: nowrap;">{{ sale.sold_at|date:"M d, Y h:i A" }}</td>
+                    <td>
+                        <span style="font-size: 12.5px; color: var(--muted);">
                             {% for item in sale.items.all %}
-                                {{ item.product.name }} (x{{ item.quantity }}){% if not forloop.last %}, {% endif %}
+                                {{ item.display_name }} (x{{ item.quantity }}){% if not forloop.last %}, {% endif %}
                             {% endfor %}
                         </span>
                     </td>
-                    <td><strong>BDT {{ sale.total_amount }}</strong></td>
+                    <td><strong>BDT {{ sale.total_amount|floatformat:2 }}</strong></td>
                     <td>
-                        <div style="display: flex; gap: 6px;">
-                            <button type="button" class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' sale.pk %}')" title="Print directly to printer">🖨️ Print</button>
-                            <a class="button" href="{% url 'sales:receipt_print' sale.pk %}" target="_blank" title="View receipt">View</a>
-                            <a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" title="Download PDF">PDF</a>
+                        <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                {% if sale.is_paid %}
+                                <span class="badge" style="background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 700; font-size: 11px;">
+                                    ✓ PAID
+                                </span>
+                                {% elif sale.is_partial %}
+                                <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 11px;">
+                                    🌓 PARTIAL
+                                </span>
+                                {% else %}
+                                <span class="badge" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; font-size: 11px;">
+                                    ⏳ UNPAID
+                                </span>
+                                {% endif %}
+                                <form method="post" action="{% url 'sales:toggle_status' sale.pk %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="button" style="padding: 2px 7px; font-size: 10.5px;" title="Toggle status">
+                                        {% if sale.is_paid %}Mark Unpaid{% else %}Mark Paid{% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                            {% if sale.is_partial %}
+                            <div style="font-size: 11px; color: #64748b; line-height: 1.2;">
+                                <span>Paid: <strong style="color: #065f46;">BDT {{ sale.effective_paid_amount|floatformat:2 }}</strong></span>
+                                <span style="margin: 0 2px;">•</span>
+                                <span>Due: <strong style="color: #991b1b;">BDT {{ sale.due_amount|floatformat:2 }}</strong></span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 5px; flex-wrap: nowrap; justify-content: flex-end;">
+                            <button type="button" class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' sale.pk %}')" title="Print directly to printer" style="padding: 5px 9px; font-size: 12px;">🖨️</button>
+                            <a class="button" href="{% url 'sales:receipt_print' sale.pk %}" target="_blank" title="View receipt" style="padding: 5px 9px; font-size: 12px;">View</a>
+                            <a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" title="Download PDF" style="padding: 5px 9px; font-size: 12px;">PDF</a>
+                            {% if sale.customer_name %}
+                            <a class="button" href="{% url 'sales:customer_statement' %}?customer={{ sale.customer_name|urlencode }}" target="_blank" title="Customer Statement" style="padding: 5px 9px; font-size: 12px; background: #f8fafc;">Ledger</a>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6">No sales yet.</td></tr>
+                <tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--muted);">No sales found matching your criteria.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -106,6 +198,52 @@
         iframe.src = url;
     }
 
+    // Checkbox and batch selection handling
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.sale-checkbox');
+    const batchActions = document.getElementById('batch-actions');
+    const selectedCount = document.getElementById('selected-count');
+
+    function updateBatchUI() {
+        const checked = Array.from(checkboxes).filter(cb => cb.checked);
+        if (checked.length > 0) {
+            batchActions.style.display = 'flex';
+            selectedCount.textContent = `${checked.length} selected`;
+        } else {
+            batchActions.style.display = 'none';
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateBatchUI();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            if (!cb.checked && selectAll) selectAll.checked = false;
+            updateBatchUI();
+        });
+    });
+
+    function getSelectedIds() {
+        return Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value).join(',');
+    }
+
+    function printSelectedStatement() {
+        const ids = getSelectedIds();
+        if (!ids) return;
+        window.open(`{% url 'sales:customer_statement_pdf' %}?ids=${ids}`, '_blank');
+    }
+
+    function viewSelectedStatement() {
+        const ids = getSelectedIds();
+        if (!ids) return;
+        window.open(`{% url 'sales:customer_statement' %}?ids=${ids}`, '_blank');
+    }
+
     {% if receipt_sale %}
     document.addEventListener('DOMContentLoaded', () => {
         printReceipt("{% url 'sales:receipt_print' receipt_sale.pk %}");
@@ -113,3 +251,4 @@
     {% endif %}
 </script>
 {% endblock %}
+

@@ -1,6 +1,6 @@
 # Mtronix
 
-Django inventory and sales MVP with products, suppliers, stock tracking, purchases, sales, and a starter dashboard.
+Django inventory and sales MVP with products, stock tracking, sales, and a starter dashboard.
 
 ## Setup
 
