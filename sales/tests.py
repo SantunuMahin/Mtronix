@@ -380,5 +380,147 @@ class SalePageTests(TestCase):
         inv = Inventory.objects.get(product=self.product)
         self.assertEqual(inv.quantity, 3)
 
+    def test_customer_lookup_api_by_name_and_phone(self):
+        InventoryService.add_stock(self.product, 20)
+        s1 = InventoryService.create_sale(
+            customer_name='Mahin Khan',
+            customer_phone='01788990011',
+            customer_address='Mirpur, Dhaka',
+            payment_status='PAID',
+            items=[{'product': self.product, 'quantity': 2, 'unit_price': '10.00'}],
+        )
+        s2 = InventoryService.create_sale(
+            customer_name='Mahin Khan',
+            customer_phone='01788990011',
+            customer_address='Mirpur, Dhaka',
+            payment_status='PARTIAL',
+            paid_amount='15.00',
+            items=[{'product': self.product, 'quantity': 3, 'unit_price': '10.00'}],
+        )
+
+        # Lookup by name
+        res_name = self.client.get('/sales/customer-lookup/?q=Mahin')
+        self.assertEqual(res_name.status_code, 200)
+        data = res_name.json()
+        self.assertTrue(len(data['results']) >= 1)
+        cust = data['results'][0]
+        self.assertEqual(cust['customer_name'], 'Mahin Khan')
+        self.assertEqual(cust['customer_phone'], '01788990011')
+        self.assertEqual(cust['total_orders'], 2)
+        self.assertEqual(cust['total_spent'], 50.00)
+        self.assertEqual(cust['total_paid'], 35.00)
+        self.assertEqual(cust['total_due'], 15.00)
+        self.assertEqual(len(cust['recent_sales']), 2)
+
+        # Lookup by phone
+        res_phone = self.client.get('/sales/customer-lookup/?q=0178899')
+        self.assertEqual(res_phone.status_code, 200)
+        phone_data = res_phone.json()
+        self.assertTrue(len(phone_data['results']) >= 1)
+        self.assertEqual(phone_data['results'][0]['customer_name'], 'Mahin Khan')
+
+        # Lookup with empty query returns empty list
+        res_empty = self.client.get('/sales/customer-lookup/?q=')
+        self.assertEqual(res_empty.status_code, 200)
+        self.assertEqual(res_empty.json()['results'], [])
+
+    def test_sale_create_page_context_contains_customers_catalog(self):
+        InventoryService.add_stock(self.product, 5)
+        InventoryService.create_sale(
+            customer_name='Recurring Buyer',
+            customer_phone='01611223344',
+            items=[{'product': self.product, 'quantity': 1, 'unit_price': '2.00'}],
+        )
+        response = self.client.get('/sales/new/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('customers_catalog', response.context)
+        self.assertTrue(any(c['customer_name'] == 'Recurring Buyer' for c in response.context['customers_catalog']))
+        self.assertContains(response, 'customer-history-box')
+        self.assertContains(response, 'cust-name-dropdown')
+
+    def test_returning_customer_previous_orders_in_receipt_html_and_pdf(self):
+        InventoryService.add_stock(self.product, 20)
+        
+        # First order
+        s1 = InventoryService.create_sale(
+            customer_name='Shakib Al Hasan',
+            customer_phone='01777889900',
+            payment_status='PARTIAL',
+            paid_amount='50.00',
+            items=[{'product': self.product, 'quantity': 10, 'unit_price': '10.00'}], # Total 100, Due 50
+        )
+
+        # Second (new) order
+        s2 = InventoryService.create_sale(
+            customer_name='Shakib Al Hasan',
+            customer_phone='01777889900',
+            payment_status='PAID',
+            items=[{'product': self.product, 'quantity': 2, 'unit_price': '10.00'}], # Total 20, Due 0
+        )
+
+        # S1 (first order) receipt should NOT have previous purchases
+        res_s1 = self.client.get(f'/sales/{s1.pk}/receipt/')
+        self.assertEqual(res_s1.status_code, 200)
+        self.assertNotContains(res_s1, 'Previous Purchases')
+
+        # S2 (new second order) receipt SHOULD contain previous purchases details and net due balance
+        res_s2 = self.client.get(f'/sales/{s2.pk}/receipt/')
+        self.assertEqual(res_s2.status_code, 200)
+        self.assertContains(res_s2, 'Previous Purchases (1 order)')
+        self.assertContains(res_s2, 'Previous Unpaid Due:')
+        self.assertContains(res_s2, 'NET TOTAL OUTSTANDING DUE:')
+        self.assertContains(res_s2, '50.00')
+
+        # S2 PDF receipt should also render successfully with previous buy details
+        res_pdf = self.client.get(f'/sales/{s2.pk}/receipt.pdf')
+        self.assertEqual(res_pdf.status_code, 200)
+        self.assertTrue(len(res_pdf.content) > 0)
+
+    def test_sale_item_preserves_product_name_on_save(self):
+        prod = Product.objects.create(
+            name='Display Panel 14 inch',
+            sku='PNL-14',
+            purchase_price='30.00',
+            selling_price='50.00',
+        )
+        InventoryService.add_stock(prod, 5)
+        sale = InventoryService.create_sale(
+            customer_name='Display Tech',
+            items=[{'product': prod, 'quantity': 1, 'unit_price': '50.00'}],
+        )
+        item = sale.items.first()
+        self.assertEqual(item.custom_name, 'Display Panel 14 inch')
+        self.assertEqual(item.display_name, 'Display Panel 14 inch')
+
+        # If product is deleted, display_name still returns original name
+        prod.delete()
+        item.refresh_from_db()
+        self.assertIsNone(item.product)
+        self.assertEqual(item.display_name, 'Display Panel 14 inch')
+
+    def test_pos_sale_logs_authenticated_user_in_stock_movement(self):
+        from inventory.models import StockMovement
+        InventoryService.add_stock(self.product, 10, user=self.user)
+        response = self.client.post(
+            '/sales/new/',
+            {
+                'customer_name': 'Walk-in Buyer',
+                'items-TOTAL_FORMS': '1',
+                'items-INITIAL_FORMS': '0',
+                'items-MIN_NUM_FORMS': '1',
+                'items-MAX_NUM_FORMS': '1000',
+                'items-0-product': self.product.pk,
+                'items-0-quantity': 3,
+                'items-0-unit_price': '2.00',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        sm = StockMovement.objects.filter(product=self.product, movement_type=StockMovement.MOVEMENT_SALE).first()
+        self.assertIsNotNone(sm)
+        self.assertEqual(sm.quantity, -3)
+        self.assertEqual(sm.user, self.user)
+
+
+
 
 

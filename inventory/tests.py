@@ -85,22 +85,105 @@ class InventoryServiceTests(TestCase):
         self.assertEqual(SaleItem.objects.count(), 0)
 
 
+    def test_stock_movement_logged_on_add_and_remove(self):
+        InventoryService.add_stock(self.product, 20, reason='Supplier Shipment', notes='Batch #881')
+        self.assertEqual(self.product.stock_movements.count(), 1)
+        m = self.product.stock_movements.first()
+        self.assertEqual(m.movement_type, 'ADD')
+        self.assertEqual(m.quantity, 20)
+        self.assertEqual(m.previous_quantity, 0)
+        self.assertEqual(m.new_quantity, 20)
+        self.assertEqual(m.reason, 'Supplier Shipment')
+        self.assertEqual(m.notes, 'Batch #881')
+
+        InventoryService.remove_stock(self.product, 5, reason='Damaged item', notes='Cracked casing')
+        self.assertEqual(self.product.stock_movements.count(), 2)
+        m2 = self.product.stock_movements.first()
+        self.assertEqual(m2.movement_type, 'REMOVE')
+        self.assertEqual(m2.quantity, -5)
+        self.assertEqual(m2.previous_quantity, 20)
+        self.assertEqual(m2.new_quantity, 15)
+
+    def test_set_stock_logs_correction(self):
+        InventoryService.add_stock(self.product, 10)
+        inv = InventoryService.set_stock(self.product, 25, reason='Physical audit count')
+        self.assertEqual(inv.quantity, 25)
+        self.assertEqual(Inventory.objects.get(product=self.product).quantity, 25)
+        m = self.product.stock_movements.first()
+        self.assertEqual(m.movement_type, 'CORRECTION')
+        self.assertEqual(m.quantity, 15)
+        self.assertEqual(m.previous_quantity, 10)
+        self.assertEqual(m.new_quantity, 25)
+
+
 class InventoryPageTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='inv_user', password='pass')
         self.client.force_login(self.user)
+        self.product = Product.objects.create(
+            name='12V 100W Driver',
+            sku='DRV-100',
+            purchase_price='200.00',
+            selling_price='350.00',
+            low_stock_threshold=5,
+        )
 
     def test_dashboard_renders(self):
         response = self.client.get('/')
-
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Dashboard')
 
-    def test_inventory_list_renders(self):
+    def test_inventory_list_renders_and_filters(self):
         response = self.client.get('/inventory/')
-
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Inventory')
+        self.assertContains(response, 'Inventory & Stock Control')
+        self.assertContains(response, '12V 100W Driver')
+
+        # Test search query
+        resp_search = self.client.get('/inventory/?q=DRV-100')
+        self.assertEqual(resp_search.status_code, 200)
+        self.assertContains(resp_search, '12V 100W Driver')
+
+        # Test status filter out of stock
+        resp_out = self.client.get('/inventory/?status=out')
+        self.assertEqual(resp_out.status_code, 200)
+        self.assertContains(resp_out, '12V 100W Driver')
+
+    def test_inventory_logs_view_renders(self):
+        InventoryService.add_stock(self.product, 15, user=self.user, reason='Initial stock')
+        response = self.client.get('/inventory/logs/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Stock Movement Audit Logs')
+        self.assertContains(response, 'Initial stock')
+
+    def test_inventory_add_stock_view_get_and_post(self):
+        inv = self.product.inventory
+        get_resp = self.client.get(f'/inventory/{inv.pk}/add/')
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertContains(get_resp, 'Add Stock')
+
+        post_resp = self.client.post(
+            f'/inventory/{inv.pk}/add/',
+            {'quantity': 10, 'reason': 'Supplier delivery', 'notes': 'Invoice #999'}
+        )
+        self.assertEqual(post_resp.status_code, 302)
+        inv.refresh_from_db()
+        self.assertEqual(inv.quantity, 10)
+
+    def test_inventory_remove_stock_view_get_and_post(self):
+        inv = self.product.inventory
+        InventoryService.add_stock(self.product, 20)
+        get_resp = self.client.get(f'/inventory/{inv.pk}/remove/')
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertContains(get_resp, 'Deduct Stock')
+
+        post_resp = self.client.post(
+            f'/inventory/{inv.pk}/remove/',
+            {'quantity': 5, 'reason': 'Damaged unit', 'notes': 'Burnt resistor'}
+        )
+        self.assertEqual(post_resp.status_code, 302)
+        inv.refresh_from_db()
+        self.assertEqual(inv.quantity, 15)
 
     def test_inventory_stock_report_pdf_renders(self):
         response = self.client.get('/inventory/report/pdf/?type=stock')

@@ -2,19 +2,126 @@
 
 {% block title %}{{ title }} - Mtronix{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
-{% block page_subtitle %}Keep product names, SKUs, prices, and low-stock limits accurate.{% endblock %}
+{% block page_subtitle %}Maintain catalog specifications, pricing thresholds, barcodes, and calculate real-time margins.{% endblock %}
 
 {% block content %}
-<section class="panel form-panel">
-    <form method="post" novalidate>
-        {% include 'includes/form.html' %}
-        <p style="margin: 8px 0 16px; font-size: 13px; color: var(--muted);">
-            Need a new category/group? <a href="{% url 'products:group_create' %}" target="_blank" style="color: var(--primary); font-weight: 600;">+ Create New Product Group</a>
-        </p>
-        <div class="form-actions">
-            <a class="button" href="{% url 'products:list' %}">Cancel</a>
-            <button class="button primary" type="submit">Save Product</button>
-        </div>
-    </form>
-</section>
+<style>
+/* ─── Self-contained Pricing Calculator Styles ─── */
+.pricing-calc-card {
+    background: linear-gradient(135deg, #f0fdfa, #f8fafc);
+    border: 1px solid #99f6e4;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin: 16px 0 20px;
+}
+.calc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+}
+.calc-stat {
+    background: #ffffff;
+    border: 1px solid #ccfbf1;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+}
+.calc-stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.calc-stat-val {
+    font-size: 18px;
+    font-weight: 800;
+    margin-top: 4px;
+}
+.calc-stat-val.profit { color: #047857; }
+.calc-stat-val.margin { color: #0f766e; }
+.calc-stat-val.markup { color: #2563eb; }
+</style>
+<div style="max-width: 820px; margin: 0 auto;">
+    <section class="panel" style="border-radius: 14px; padding: 28px;">
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert" style="margin-bottom: 20px; background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 12px 16px; border-radius: 8px;">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div style="display: grid; grid-template-columns: 1fr; gap: 18px;">
+                <!-- Product Name -->
+                <label class="field">
+                    <span style="font-weight: 700; color: #0f172a;">Product Name <span style="color: #dc2626;">*</span></span>
+                    {{ form.name }}
+                    {% if form.name.help_text %}<small style="color: #64748b;">{{ form.name.help_text }}</small>{% endif %}
+                    {% for error in form.name.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
+                </label>
+
+                <!-- Category Group & SKU row -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px;">
+                    <!-- Group -->
+                    <label class="field">
+                        <span style="font-weight: 700; color: #0f172a;">Product Group / Category</span>
+                        {{ form.group }}
+                        <div style="margin-top: 4px; font-size: 12px; color: #64748b;">
+                            New category? <a href="{% url 'products:group_create' %}" target="_blank" style="color: #0f766e; font-weight: 600;">+ Create New Group</a>
+                        </div>
+                        {% for error in form.group.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
+                    </label>
+
+                    <!-- SKU / Barcode -->
+                    <label class="field">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="font-weight: 700; color: #0f172a;">SKU / Barcode</span>
+                            <button type="button" id="btn-generate-sku" class="button" style="padding: 2px 8px; font-size: 11px; height: auto; background: #f1f5f9; border-color: #cbd5e1; font-weight: 600;">
+                                ⚡ Auto-Generate
+                            </button>
+                        </div>
+                        {{ form.sku }}
+                        {% if form.sku.help_text %}<small style="color: #64748b;">{{ form.sku.help_text }}</small>{% endif %}
+                        {% for error in form.sku.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
+                    </label>
+                </div>
+
+                <!-- Selling Price & Low Stock Threshold Row -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px;">
+                    <!-- Selling Price -->
+                    <label class="field">
+                        <span style="font-weight: 700; color: #0f172a;">Selling Price (BDT) <span style="color: #dc2626;">*</span></span>
+                        <div style="position: relative;">
+                            <span style="position: absolute; left: 12px; top: 11px; color: #64748b; font-size: 13px; font-weight: 700;">BDT</span>
+                            <div style="padding-left: 36px;">
+                                {{ form.selling_price }}
+                            </div>
+                        </div>
+                        <small style="color: #64748b;">Customer retail price at POS checkout.</small>
+                        {% for error in form.selling_price.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
+                    </label>
+
+                    <!-- Low Stock Threshold -->
+                    <label class="field">
+                        <span style="font-weight: 700; color: #0f172a;">Low Stock Threshold <span style="color: #dc2626;">*</span></span>
+                        {{ form.low_stock_threshold }}
+                        <small style="color: #64748b;">Alert triggers when stock drops to or below this quantity.</small>
+                        {% for error in form.low_stock_threshold.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
+                    </label>
+                </div>
+            </div>
+
+            <!-- Form Action Buttons -->
+            <div class="form-actions" style="margin-top: 28px; padding-top: 18px; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 10px;">
+                <a class="button" href="{% url 'products:list' %}" style="padding: 8px 18px;">Cancel</a>
+                <button class="button primary" type="submit" style="padding: 8px 24px; font-weight: 700; box-shadow: 0 4px 12px rgba(15,118,110,0.25);">
+                    Save Product
+                </button>
+            </div>
+        </form>
+    </section>
+</div>
 {% endblock %}

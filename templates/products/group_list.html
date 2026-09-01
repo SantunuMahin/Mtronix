@@ -1,25 +1,217 @@
 {% extends 'base.html' %}
 
-{% block title %}Product Groups - Mtronix{% endblock %}
-{% block page_title %}Product Groups{% endblock %}
-{% block page_subtitle %}Organize products into categories and groups for easy filtering and tracking.{% endblock %}
+{% block title %}Product Groups & Categories - Mtronix{% endblock %}
+{% block page_title %}Product Groups & Categories{% endblock %}
+{% block page_subtitle %}Organize catalog items into structured groups with inventory valuation and aggregated statistics.{% endblock %}
 
 {% block header_action %}
 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-    <a class="button" href="{% url 'products:list' %}">← Back to Products</a>
-    <a class="button primary" href="{% url 'products:group_create' %}">+ New Group</a>
+    <a class="button" href="{% url 'products:list' %}" style="background: #ffffff; border: 1px solid var(--border); font-weight: 600; font-size: 13px;">
+        ← Products Catalog
+    </a>
+    <a class="button primary" href="{% url 'products:group_create' %}" style="font-weight: 700; font-size: 13px; box-shadow: 0 4px 12px rgba(15,118,110,0.25);">
+        + New Group
+    </a>
 </div>
 {% endblock %}
 
 {% block content %}
-<section class="panel">
+<style>
+/* ─── Self-contained Group Cards & KPI Styles ─── */
+.product-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+.p-kpi {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+.p-kpi-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+    letter-spacing: .05em;
+}
+.p-kpi-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 4px;
+}
+.group-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+    margin-bottom: 24px;
+}
+.group-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.group-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    border-color: #cbd5e1;
+}
+.group-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+.group-card-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+.group-card-desc {
+    font-size: 12.5px;
+    color: #64748b;
+    margin: 6px 0 14px;
+    line-height: 1.4;
+    min-height: 35px;
+}
+.group-card-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+}
+.group-card-stat-label {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+}
+.group-card-stat-val {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.group-card-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+</style>
+
+<!-- ── Group Overview KPIs ── -->
+<div class="product-kpis">
+    <div class="p-kpi">
+        <div class="p-kpi-label">Active Groups</div>
+        <div class="p-kpi-val">{{ total_groups_count }} <span style="font-size: 13px; font-weight: 600; color: #64748b;">Categories</span></div>
+    </div>
+    <div class="p-kpi">
+        <div class="p-kpi-label">Categorized Products</div>
+        <div class="p-kpi-val">{{ total_categorized_products }} <span style="font-size: 13px; font-weight: 600; color: #64748b;">Items</span></div>
+    </div>
+    <div class="p-kpi">
+        <div class="p-kpi-label">Total Group Valuation</div>
+        <div class="p-kpi-val" style="color: #0f766e;">BDT {{ total_groups_valuation|floatformat:0 }}</div>
+    </div>
+    {% if top_group %}
+    <div class="p-kpi">
+        <div class="p-kpi-label">Top Category by Value</div>
+        <div class="p-kpi-val" style="font-size: 16px; color: #2563eb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ top_group.name }}">
+            📁 {{ top_group.name }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Visual Category Cards Grid ── -->
+<h3 style="font-size: 15px; font-weight: 700; margin: 24px 0 14px; color: #0f172a;">Categories Overview</h3>
+<div class="group-cards-grid">
+    {% for group in groups %}
+    <article class="group-card">
+        <div>
+            <div class="group-card-head">
+                <a href="{% url 'products:list' %}?group={{ group.pk }}" style="text-decoration: none;">
+                    <h4 class="group-card-title">📁 {{ group.name }}</h4>
+                </a>
+                <span class="badge" style="background: #eff6ff; color: #2563eb; font-weight: 700; font-size: 11px;">
+                    {{ group.product_count }} item{% if group.product_count != 1 %}s{% endif %}
+                </span>
+            </div>
+            <p class="group-card-desc">
+                {{ group.description|default:"No description provided for this group." }}
+            </p>
+
+            <div class="group-card-stats">
+                <div>
+                    <span class="group-card-stat-label">In-Stock Units</span>
+                    <div class="group-card-stat-val">{{ group.total_stock }}</div>
+                </div>
+                <div>
+                    <span class="group-card-stat-label">Retail Value</span>
+                    <div class="group-card-stat-val" style="color: #047857;">BDT {{ group.total_retail_value|floatformat:0 }}</div>
+                </div>
+                <div>
+                    <span class="group-card-stat-label">Avg Selling Price</span>
+                    <div class="group-card-stat-val">BDT {{ group.avg_price|floatformat:0 }}</div>
+                </div>
+                <div>
+                    <span class="group-card-stat-label">Potential Margin</span>
+                    <div class="group-card-stat-val" style="color: #0f766e;">BDT {{ group.potential_profit|floatformat:0 }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="group-card-actions">
+            <a class="button" href="{% url 'products:list' %}?group={{ group.pk }}" title="View products in this category" style="font-size: 12px; font-weight: 600;">
+                View Items &rarr;
+            </a>
+            <a class="button" href="{% url 'products:group_update' group.pk %}" style="font-size: 12px;">
+                Edit
+            </a>
+            <a class="button" href="{% url 'products:group_delete' group.pk %}" style="font-size: 12px; color: #dc2626;">
+                ✕
+            </a>
+        </div>
+    </article>
+    {% empty %}
+    <div style="grid-column: 1 / -1; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px; text-align: center;">
+        <div style="font-size: 36px; margin-bottom: 8px;">📁</div>
+        <strong style="color: #0f172a; font-size: 15px;">No product groups created yet.</strong>
+        <p style="color: #64748b; font-size: 13px; margin: 6px 0 16px;">Create product groups like "Power Supplies", "LED Drivers", or "Sensors" to categorize your catalog.</p>
+        <a class="button primary" href="{% url 'products:group_create' %}">+ Create First Group</a>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ── Detailed Group Table Section ── -->
+{% if groups %}
+<section class="panel" style="border-radius: 14px; margin-top: 30px;">
+    <div class="panel-head" style="margin-bottom: 14px;">
+        <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0;">Detailed Groups Table</h3>
+        <span style="font-size: 12px; color: #64748b;">Summary table of all registered groups</span>
+    </div>
     <div class="table-wrap">
-        <table data-filter-table>
+        <table>
             <thead>
                 <tr>
                     <th>Group Name</th>
                     <th>Description</th>
-                    <th>Products Count</th>
+                    <th>SKUs</th>
+                    <th>Total Stock Units</th>
+                    <th>Total Valuation</th>
                     <th>Created</th>
                     <th style="text-align: right;">Actions</th>
                 </tr>
@@ -28,30 +220,25 @@
                 {% for group in groups %}
                 <tr>
                     <td>
-                        <a href="{% url 'products:list' %}?group={{ group.pk }}" style="font-weight: 600; color: var(--primary); text-decoration: none;">
+                        <a href="{% url 'products:list' %}?group={{ group.pk }}" style="font-weight: 700; color: #0f766e; text-decoration: none;">
                             📁 {{ group.name }}
                         </a>
                     </td>
-                    <td>{{ group.description|default:"—" }}</td>
+                    <td style="color: #64748b; font-size: 12.5px;">{{ group.description|default:"—" }}</td>
                     <td>
                         <a class="badge" href="{% url 'products:list' %}?group={{ group.pk }}" style="text-decoration: none;">
-                            {{ group.products.count }} products
+                            {{ group.product_count }} items
                         </a>
                     </td>
-                    <td>{{ group.created_at|date:"M d, Y" }}</td>
+                    <td style="font-weight: 600;">{{ group.total_stock }} units</td>
+                    <td style="font-weight: 700; color: #047857;">BDT {{ group.total_retail_value|floatformat:2 }}</td>
+                    <td style="color: #64748b; font-size: 12px;">{{ group.created_at|date:"M d, Y" }}</td>
                     <td style="text-align: right;">
-                        <div style="display: inline-flex; gap: 6px;">
-                            <a class="button" href="{% url 'products:list' %}?group={{ group.pk }}" title="View products in this group">View</a>
-                            <a class="button" href="{% url 'products:group_update' group.pk %}">Edit</a>
-                            <a class="button" href="{% url 'products:group_delete' group.pk %}" style="color: #dc2626;">Delete</a>
+                        <div style="display: inline-flex; gap: 4px;">
+                            <a class="button" href="{% url 'products:list' %}?group={{ group.pk }}" style="padding: 3px 8px; font-size: 11.5px; height: auto;">View</a>
+                            <a class="button" href="{% url 'products:group_update' group.pk %}" style="padding: 3px 8px; font-size: 11.5px; height: auto;">Edit</a>
+                            <a class="button" href="{% url 'products:group_delete' group.pk %}" style="padding: 3px 8px; font-size: 11.5px; height: auto; color: #dc2626;">Delete</a>
                         </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5" style="text-align: center; padding: 32px 16px;">
-                        <p style="color: var(--muted); margin-bottom: 12px;">No product groups yet.</p>
-                        <a class="button primary" href="{% url 'products:group_create' %}">Create Your First Group</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -59,4 +246,5 @@
         </table>
     </div>
 </section>
+{% endif %}
 {% endblock %}

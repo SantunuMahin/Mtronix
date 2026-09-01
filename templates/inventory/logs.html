@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Movement Audit Logs - Mtronix{% endblock %}
+{% block page_title %}Stock Movement Audit Logs{% endblock %}
+{% block page_subtitle %}Complete chronological traceability of all stock additions, deductions, sales, purchases, and audit corrections.{% endblock %}
+
+{% block header_action %}
+<div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <a class="button" href="{% url 'inventory:list' %}" style="background: var(--surface); border: 1px solid var(--border); font-weight: 600; font-size: 13px;">
+        &larr; Back to Inventory
+    </a>
+    <a class="button primary" href="{% url 'inventory:report_pdf' %}?type=updated_stock&period=today" target="_blank" style="font-weight: 700; font-size: 13px;">
+        🖨️ Today's Stock PDF
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.log-badge-add { background: #d1fae5; color: #047857; border: 1px solid #a7f3d0; }
+.log-badge-remove { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.log-badge-sale { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+.log-badge-purchase { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.log-badge-correction { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+
+.log-filter-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+.log-search-box {
+    flex: 1;
+    min-width: 240px;
+}
+.log-search-box input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--border, #cbd5e1);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--surface, #ffffff);
+}
+</style>
+
+<section class="panel" style="border-radius: 12px;">
+
+    <!-- Filter Toolbar -->
+    <form method="get" class="log-filter-toolbar">
+        <div class="log-search-box">
+            <input type="text" name="q" value="{{ query }}" placeholder="Search by product name, SKU, reason, notes..." autocomplete="off">
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <!-- Product Filter -->
+            <select name="product" onchange="this.form.submit()" style="height: 38px; padding: 0 10px; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; font-family: inherit; font-size: 13px; background: var(--surface, #ffffff);">
+                <option value="">— All Products —</option>
+                {% for p in all_products %}
+                <option value="{{ p.pk }}" {% if selected_product_id == p.pk|stringformat:"d" %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+            </select>
+
+            <!-- Movement Type Filter -->
+            <select name="type" onchange="this.form.submit()" style="height: 38px; padding: 0 10px; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; font-family: inherit; font-size: 13px; background: var(--surface, #ffffff);">
+                <option value="ALL">— All Movement Types —</option>
+                {% for code, label in movement_types %}
+                <option value="{{ code }}" {% if selected_type == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+
+            <button class="button primary" type="submit" style="height: 38px; padding: 0 14px;">Filter</button>
+            {% if query or selected_product_id or selected_type and selected_type != 'ALL' %}
+            <a class="button" href="{% url 'inventory:logs' %}" style="height: 38px; padding: 0 12px;">Reset</a>
+            {% endif %}
+        </div>
+    </form>
+
+    <div style="margin-bottom: 14px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center;">
+        <span>Showing <strong>{{ movements|length }}</strong> of {{ total_movements_count }} recorded stock movement logs</span>
+    </div>
+
+    <!-- Movement Logs Table -->
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Product</th>
+                    <th>Movement Type</th>
+                    <th style="text-align: center;">Change (Qty)</th>
+                    <th style="text-align: center;">Stock Transition</th>
+                    <th>Reason / Activity</th>
+                    <th>Notes & Reference</th>
+                    <th>Authorized By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in movements %}
+                <tr>
+                    <td style="font-size: 12px; white-space: nowrap; color: var(--muted);">
+                        {{ log.created_at|date:"M d, Y" }}<br>
+                        <span style="font-size: 11px;">{{ log.created_at|date:"h:i:s A" }}</span>
+                    </td>
+                    <td>
+                        <strong style="font-size: 13px; color: var(--text);">{{ log.product.name }}</strong>
+                        {% if log.product.sku %}
+                        <div style="font-size: 11px; color: var(--muted); font-family: monospace;">SKU: {{ log.product.sku }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.movement_type == 'ADD' %}
+                        <span class="badge log-badge-add" style="font-weight: 700; font-size: 11px;">+ Stock In</span>
+                        {% elif log.movement_type == 'REMOVE' %}
+                        <span class="badge log-badge-remove" style="font-weight: 700; font-size: 11px;">− Stock Out</span>
+                        {% elif log.movement_type == 'SALE' %}
+                        <span class="badge log-badge-sale" style="font-weight: 700; font-size: 11px;">🛒 POS Sale</span>
+                        {% elif log.movement_type == 'PURCHASE' %}
+                        <span class="badge log-badge-purchase" style="font-weight: 700; font-size: 11px;">📥 Purchase</span>
+                        {% else %}
+                        <span class="badge log-badge-correction" style="font-weight: 700; font-size: 11px;">⚙️ Audit Correction</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        <strong style="font-size: 13.5px; {% if log.quantity > 0 %}color: #047857;{% elif log.quantity < 0 %}color: #991b1b;{% else %}color: var(--muted);{% endif %}">
+                            {% if log.quantity > 0 %}+{{ log.quantity }}{% else %}{{ log.quantity }}{% endif %}
+                        </strong>
+                    </td>
+                    <td style="text-align: center; font-size: 12.5px; color: var(--muted);">
+                        <span>{{ log.previous_quantity }}</span>
+                        <span style="margin: 0 4px; font-weight: bold; color: var(--text);">&rarr;</span>
+                        <strong style="color: var(--text);">{{ log.new_quantity }}</strong>
+                    </td>
+                    <td style="font-size: 12.5px;">
+                        <span style="color: var(--text); font-weight: 500;">{{ log.reason }}</span>
+                    </td>
+                    <td style="font-size: 12px; color: var(--muted);">
+                        {{ log.notes|default:"—" }}
+                    </td>
+                    <td style="font-size: 12px; color: var(--muted);">
+                        {{ log.user.username|default:"System / Admin" }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 40px; color: var(--muted);">
+                        <div style="font-size: 32px; margin-bottom: 8px;">📝</div>
+                        No stock movement logs found for the selected criteria.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

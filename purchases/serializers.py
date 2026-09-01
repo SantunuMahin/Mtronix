@@ -21,7 +21,9 @@ class PurchaseSerializer(serializers.ModelSerializer):
         read_only_fields = ['purchased_at']
 
     def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user if request and request.user.is_authenticated else None
         try:
-            return InventoryService.create_purchase(**validated_data)
+            return InventoryService.create_purchase(user=user, **validated_data)
         except ValueError as exc:
             raise serializers.ValidationError({'quantity': str(exc)}) from exc

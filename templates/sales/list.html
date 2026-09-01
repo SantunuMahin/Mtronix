@@ -1,83 +1,289 @@
 {% extends 'base.html' %}
 
-{% block title %}Sales - Mtronix{% endblock %}
-{% block page_title %}Sales{% endblock %}
-{% block page_subtitle %}Manage customer transactions, track paid/unpaid status, and print statements.{% endblock %}
-{% block header_action %}<a class="button primary" href="{% url 'sales:create' %}">New Sale</a>{% endblock %}
+{% block title %}Sales Management & Ledger - Mtronix{% endblock %}
+{% block page_title %}Sales & Transactions{% endblock %}
+{% block page_subtitle %}Review sales records, monitor payment dues, print invoices, and manage customer ledgers.{% endblock %}
+
+{% block header_action %}
+<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="button" href="{% url 'sales:customer_statement' %}" style="background: #ffffff; border: 1px solid var(--border); font-weight: 600; font-size: 13px;">
+        👥 Customer Ledgers
+    </a>
+    <a class="button" href="{% url 'sales:report_pdf' %}?period={{ period|default:'today' }}" target="_blank" style="background: #ffffff; border: 1px solid var(--border); font-weight: 600; font-size: 13px;">
+        🖨️ Sales Report PDF
+    </a>
+    <a class="button primary" href="{% url 'sales:create' %}" style="font-weight: 700; font-size: 13px; box-shadow: 0 4px 12px rgba(15,118,110,0.25);">
+        ⚡ New Sale (POS)
+    </a>
+</div>
+{% endblock %}
 
 {% block content %}
-<!-- Metrics Summary -->
-<section class="metrics" style="margin-bottom: 20px;">
-    <article class="metric-card">
-        <span>Total Sales</span>
-        <strong>{{ total_count }}</strong>
-    </article>
-    <article class="metric-card">
-        <span>Total Revenue</span>
-        <strong>BDT {{ total_revenue|floatformat:2 }}</strong>
-    </article>
-    <article class="metric-card" style="border-left: 4px solid #10b981;">
-        <span style="color: #065f46;">Total Paid</span>
-        <strong style="color: #059669;">BDT {{ total_paid|floatformat:2 }}</strong>
-    </article>
-    <article class="metric-card warning">
-        <span>Outstanding Due</span>
-        <strong>BDT {{ total_unpaid|floatformat:2 }}</strong>
-    </article>
-</section>
+<style>
+/* ─── Self-Contained Sales Workspace Styles ─────────────────────── */
+.sales-period-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.sales-pills {
+    display: inline-flex;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    gap: 4px;
+}
+.sales-pill {
+    padding: 6px 16px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #64748b;
+    transition: all 0.15s ease;
+}
+.sales-pill:hover {
+    color: #0f172a;
+}
+.sales-pill.active {
+    background: #0f766e;
+    color: #ffffff !important;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(15,118,110,0.25);
+}
+
+/* Status Filter Tabs Bar */
+.sales-filter-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.status-tabs {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.status-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #475569;
+    transition: all 0.15s ease;
+}
+.status-tab:hover {
+    background: #f8fafc;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+.status-tab.active {
+    background: #0f766e;
+    color: #ffffff !important;
+    border-color: #0f766e;
+    box-shadow: 0 2px 6px rgba(15,118,110,0.22);
+}
+.status-badge-count {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+}
+.status-tab.active .status-badge-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+/* Search and Sort Toolbar */
+.sales-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.sales-search-form {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    min-width: 280px;
+}
+.sales-search-input {
+    flex: 1;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13.5px;
+    background: #ffffff;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sales-search-input:focus {
+    border-color: #0f766e;
+    box-shadow: 0 0 0 3px rgba(15,118,110,0.12);
+    outline: none;
+}
+.sort-select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #0f172a;
+    background: #ffffff;
+    cursor: pointer;
+}
+
+/* Sale Code Badge */
+.sale-code-badge {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0f766e;
+    background: #f0fdfa;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid #ccfbf1;
+    display: inline-block;
+}
+
+/* Batch Actions Floating Bar */
+#batch-actions {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    background: #ecfdf5;
+    padding: 8px 16px;
+    border-radius: 10px;
+    border: 1px solid #a7f3d0;
+    box-shadow: 0 4px 12px rgba(16,185,129,0.12);
+}
+</style>
+
+<!-- ── Period Selector Filter Tabs (Timeline View) ── -->
+<div class="sales-period-nav">
+    <div class="sales-pills">
+        <a href="?period=all{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="sales-pill {% if period == 'all' or not period %}active{% endif %}">
+            All Time
+        </a>
+        <a href="?period=today{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="sales-pill {% if period == 'today' %}active{% endif %}">
+            Today
+        </a>
+        <a href="?period=week{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="sales-pill {% if period == 'week' %}active{% endif %}">
+            This Week
+        </a>
+        <a href="?period=month{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="sales-pill {% if period == 'month' %}active{% endif %}">
+            This Month
+        </a>
+        <a href="?period=year{% if status_filter and status_filter != 'all' %}&status={{ status_filter }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="sales-pill {% if period == 'year' %}active{% endif %}">
+            This Year
+        </a>
+    </div>
+
+    <!-- Quick PDF Reports Dropdown / Buttons -->
+    <div style="display: flex; gap: 8px; align-items: center;">
+        <span style="color: #64748b; font-size: 12px; font-weight: 600;">Export PDF:</span>
+        <a class="button" href="{% url 'sales:report_pdf' %}?period=today" target="_blank" style="padding: 5px 10px; font-size: 12px; background: #ffffff;">Today</a>
+        <a class="button" href="{% url 'sales:report_pdf' %}?period=month" target="_blank" style="padding: 5px 10px; font-size: 12px; background: #ffffff;">Month</a>
+        <a class="button" href="{% url 'sales:report_pdf' %}?period=year" target="_blank" style="padding: 5px 10px; font-size: 12px; background: #ffffff;">Year</a>
+    </div>
+</div>
 
 {% if receipt_sale %}
-<section class="panel" style="margin-bottom: 16px; border-color: #a7f3d0; background: #ecfdf5;">
+<!-- Instant Receipt Print Banner -->
+<section class="panel" style="margin-bottom: 20px; border-color: #a7f3d0; background: #ecfdf5; border-radius: 12px; padding: 16px 20px;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-        <span style="color: #065f46; font-weight: 600;">Sale #{{ receipt_sale.pk }} saved. Printing receipt...</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">✅</span>
+            <div>
+                <strong style="color: #065f46; font-size: 14.5px;">Sale #{{ receipt_sale.pk }} successfully recorded!</strong>
+                <p style="margin: 2px 0 0; font-size: 12px; color: #047857;">Total: BDT {{ receipt_sale.total_amount|floatformat:2 }} &bull; Paid: BDT {{ receipt_sale.effective_paid_amount|floatformat:2 }}</p>
+            </div>
+        </div>
         <div style="display: flex; gap: 8px;">
-            <button class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' receipt_sale.pk %}')">🖨️ Print Again</button>
-            <a class="button" href="{% url 'sales:receipt_print' receipt_sale.pk %}" target="_blank">View Receipt</a>
-            <a class="button" href="{% url 'sales:receipt_pdf' receipt_sale.pk %}" target="_blank">PDF</a>
+            <button class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' receipt_sale.pk %}')" style="font-weight: 700; font-size: 12.5px;">🖨️ Print Receipt Again</button>
+            <a class="button" href="{% url 'sales:receipt_print' receipt_sale.pk %}" target="_blank" style="font-size: 12.5px;">View A4</a>
+            <a class="button" href="{% url 'sales:receipt_pdf' receipt_sale.pk %}" target="_blank" style="font-size: 12.5px;">PDF</a>
         </div>
     </div>
 </section>
 {% endif %}
 
-<section class="panel">
-    <!-- Filter & Search Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 18px; flex-wrap: wrap;">
-        <!-- Status Filter Tabs -->
-        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-            <span style="font-size: 13px; font-weight: 600; color: var(--muted); margin-right: 4px;">Status:</span>
-            <a href="?q={{ query|default:'' }}&status=all" class="button {% if status_filter == 'all' or not status_filter %}primary{% endif %}" style="padding: 5px 12px; font-size: 12.5px;">All</a>
-            <a href="?q={{ query|default:'' }}&status=paid" class="button {% if status_filter == 'paid' %}primary{% endif %}" style="padding: 5px 12px; font-size: 12.5px;">✓ Paid</a>
-            <a href="?q={{ query|default:'' }}&status=partial" class="button {% if status_filter == 'partial' %}primary{% endif %}" style="padding: 5px 12px; font-size: 12.5px;">🌓 Partial / Due</a>
-            <a href="?q={{ query|default:'' }}&status=unpaid" class="button {% if status_filter == 'unpaid' %}primary{% endif %}" style="padding: 5px 12px; font-size: 12.5px;">⏳ Unpaid</a>
+<!-- ── Main Sales Ledger Panel ── -->
+<section class="panel" style="border-radius: 14px; padding: 22px;">
+
+    <!-- Status Tabs Strip -->
+    <div class="sales-filter-strip">
+        <div class="status-tabs">
+            <a href="?status=all{% if period %}&period={{ period }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="status-tab {% if status_filter == 'all' or not status_filter %}active{% endif %}">
+                All Orders <span class="status-badge-count">{{ count_all }}</span>
+            </a>
+            <a href="?status=paid{% if period %}&period={{ period }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="status-tab {% if status_filter == 'paid' %}active{% endif %}">
+                ✓ Paid <span class="status-badge-count">{{ count_paid }}</span>
+            </a>
+            <a href="?status=partial{% if period %}&period={{ period }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="status-tab {% if status_filter == 'partial' %}active{% endif %}">
+                🌓 Partial / Due <span class="status-badge-count">{{ count_partial }}</span>
+            </a>
+            <a href="?status=unpaid{% if period %}&period={{ period }}{% endif %}{% if query %}&q={{ query }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}" class="status-tab {% if status_filter == 'unpaid' %}active{% endif %}">
+                ⏳ Unpaid <span class="status-badge-count">{{ count_unpaid }}</span>
+            </a>
         </div>
 
-        <!-- PDF Reports & Bulk Print -->
-        <div class="actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <span style="color: var(--muted); font-size: 13px; font-weight: 600;">Periodic Reports:</span>
-            <a class="button" href="{% url 'sales:report_pdf' %}?period=today" target="_blank">Today</a>
-            <a class="button" href="{% url 'sales:report_pdf' %}?period=month" target="_blank">This Month</a>
-            <a class="button" href="{% url 'sales:report_pdf' %}?period=year" target="_blank">This Year</a>
+        <!-- Multi-Selection Batch Actions Bar -->
+        <div id="batch-actions">
+            <span id="selected-count" style="font-size: 12.5px; font-weight: 700; color: #065f46;">0 selected</span>
+            <button type="button" class="button primary" onclick="printSelectedStatement()" style="padding: 5px 12px; font-size: 12px;">📄 Print Selected Statement</button>
+            <button type="button" class="button" onclick="viewSelectedStatement()" style="padding: 5px 12px; font-size: 12px; background: #ffffff;">View Ledger</button>
         </div>
     </div>
 
-    <!-- Search + Batch Action Bar -->
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
-        <form method="get" style="display: flex; gap: 8px; flex: 1; min-width: 280px;">
-            <input type="hidden" name="status" value="{{ status_filter|default:'all' }}">
-            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search customer name, phone, address, sale ID, or product..." style="flex: 1; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 13px;">
-            <button class="button primary" type="submit">Search</button>
+    <!-- Search + Sorting Toolbar -->
+    <div class="sales-toolbar">
+        <form method="get" class="sales-search-form">
+            {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+            {% if period %}<input type="hidden" name="period" value="{{ period }}">{% endif %}
+            {% if sort_by %}<input type="hidden" name="sort" value="{{ sort_by }}">{% endif %}
+            <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search by customer name, phone, address, sale ID (#18), or item name..." class="sales-search-input">
+            <button class="button primary" type="submit" style="font-weight: 600; padding: 0 18px;">Search</button>
             {% if query %}
-            <a class="button" href="{% url 'sales:list' %}?status={{ status_filter|default:'all' }}">Clear</a>
+            <a class="button" href="{% url 'sales:list' %}?status={{ status_filter|default:'all' }}{% if period %}&period={{ period }}{% endif %}" style="display: inline-flex; align-items: center;">Clear</a>
             {% endif %}
         </form>
 
-        <div id="batch-actions" style="display: none; align-items: center; gap: 8px; background: #f0fdf4; padding: 6px 12px; border-radius: 8px; border: 1px solid #bbf7d0;">
-            <span id="selected-count" style="font-size: 12.5px; font-weight: 600; color: #065f46;">0 selected</span>
-            <button type="button" class="button primary" onclick="printSelectedStatement()" style="padding: 5px 12px; font-size: 12px;">📄 Print Selected Statement</button>
-            <button type="button" class="button" onclick="viewSelectedStatement()" style="padding: 5px 12px; font-size: 12px;">View Statement</button>
-        </div>
+        <!-- Sort Selector Form -->
+        <form method="get" style="display: flex; align-items: center; gap: 8px;">
+            {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+            {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+            {% if period %}<input type="hidden" name="period" value="{{ period }}">{% endif %}
+            <span style="font-size: 12.5px; color: #64748b; font-weight: 600;">Sort By:</span>
+            <select name="sort" onchange="this.form.submit()" class="sort-select">
+                <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Date: Newest First</option>
+                <option value="oldest" {% if sort_by == 'oldest' %}selected{% endif %}>Date: Oldest First</option>
+                <option value="amount_desc" {% if sort_by == 'amount_desc' %}selected{% endif %}>Amount: High &rarr; Low</option>
+                <option value="amount_asc" {% if sort_by == 'amount_asc' %}selected{% endif %}>Amount: Low &rarr; High</option>
+                <option value="customer" {% if sort_by == 'customer' %}selected{% endif %}>Customer Name (A-Z)</option>
+            </select>
+        </form>
     </div>
 
+    <!-- Sales Table -->
     <div class="table-wrap">
         <table>
             <thead>
@@ -87,9 +293,9 @@
                     </th>
                     <th>Sale ID</th>
                     <th>Customer Details</th>
-                    <th>Date</th>
-                    <th>Products Sold</th>
-                    <th>Total</th>
+                    <th>Date & Time</th>
+                    <th>Items Sold</th>
+                    <th>Total Amount</th>
                     <th>Payment Status</th>
                     <th style="text-align: right;">Actions</th>
                 </tr>
@@ -100,32 +306,43 @@
                     <td style="text-align: center;">
                         <input type="checkbox" class="sale-checkbox" value="{{ sale.pk }}" style="cursor: pointer;">
                     </td>
-                    <td><strong>SALE-{{ sale.pk|stringformat:"05d" }}</strong></td>
+                    <td>
+                        <span class="sale-code-badge">#{{ sale.pk|stringformat:"05d" }}</span>
+                    </td>
                     <td>
                         <div style="display: flex; flex-direction: column; gap: 2px;">
-                            <strong>{{ sale.customer_name|default:'Walk-in Customer' }}</strong>
+                            <strong style="font-size: 13.5px; color: #0f172a;">{{ sale.customer_name|default:'Walk-in Customer' }}</strong>
                             {% if sale.customer_phone %}
-                            <span style="font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace;">📞 {{ sale.customer_phone }}</span>
+                            <a href="tel:{{ sale.customer_phone }}" style="font-size: 12px; color: #0f766e; text-decoration: none; font-family: monospace; display: inline-flex; align-items: center; gap: 4px;">
+                                📞 {{ sale.customer_phone }}
+                            </a>
                             {% endif %}
                             {% if sale.customer_address %}
-                            <span style="font-size: 11.5px; color: var(--muted);">📍 {{ sale.customer_address }}</span>
+                            <span style="font-size: 11px; color: #64748b;">📍 {{ sale.customer_address }}</span>
                             {% endif %}
                         </div>
                     </td>
-                    <td style="font-size: 12.5px; white-space: nowrap;">{{ sale.sold_at|date:"M d, Y h:i A" }}</td>
-                    <td>
-                        <span style="font-size: 12.5px; color: var(--muted);">
-                            {% for item in sale.items.all %}
-                                {{ item.display_name }} (x{{ item.quantity }}){% if not forloop.last %}, {% endif %}
-                            {% endfor %}
-                        </span>
+                    <td style="font-size: 12.5px; white-space: nowrap; color: #64748b;">
+                        <strong style="color: #0f172a;">{{ sale.sold_at|date:"M d, Y" }}</strong><br>
+                        <span style="font-size: 11px;">{{ sale.sold_at|date:"h:i A" }}</span>
                     </td>
-                    <td><strong>BDT {{ sale.total_amount|floatformat:2 }}</strong></td>
+                    <td>
+                        <div style="font-size: 12.5px; color: #475569; max-width: 260px; line-height: 1.35;">
+                            {% for item in sale.items.all %}
+                                <span style="font-weight: 600; color: #0f172a;">{{ item.display_name }}</span> <span style="color: #64748b; font-size: 11.5px;">(&times;{{ item.quantity }})</span>{% if not forloop.last %}, {% endif %}
+                            {% empty %}
+                                <span style="color: #94a3b8; font-style: italic;">No line items</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <strong style="font-size: 14.5px; color: #0f172a;">BDT {{ sale.total_amount|floatformat:2 }}</strong>
+                    </td>
                     <td>
                         <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
                             <div style="display: flex; align-items: center; gap: 6px;">
                                 {% if sale.is_paid %}
-                                <span class="badge" style="background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 700; font-size: 11px;">
+                                <span class="badge" style="background: #d1fae5; color: #047857; border: 1px solid #a7f3d0; font-weight: 700; font-size: 11px;">
                                     ✓ PAID
                                 </span>
                                 {% elif sale.is_partial %}
@@ -133,46 +350,55 @@
                                     🌓 PARTIAL
                                 </span>
                                 {% else %}
-                                <span class="badge" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; font-size: 11px;">
+                                <span class="badge" style="background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700; font-size: 11px;">
                                     ⏳ UNPAID
                                 </span>
                                 {% endif %}
+
                                 <form method="post" action="{% url 'sales:toggle_status' sale.pk %}" style="display: inline;">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <button type="submit" class="button" style="padding: 2px 7px; font-size: 10.5px;" title="Toggle status">
+                                    <button type="submit" class="button" style="padding: 2px 7px; font-size: 10.5px; font-weight: 600;" title="Quick Toggle Status">
                                         {% if sale.is_paid %}Mark Unpaid{% else %}Mark Paid{% endif %}
                                     </button>
                                 </form>
                             </div>
                             {% if sale.is_partial %}
                             <div style="font-size: 11px; color: #64748b; line-height: 1.2;">
-                                <span>Paid: <strong style="color: #065f46;">BDT {{ sale.effective_paid_amount|floatformat:2 }}</strong></span>
-                                <span style="margin: 0 2px;">•</span>
-                                <span>Due: <strong style="color: #991b1b;">BDT {{ sale.due_amount|floatformat:2 }}</strong></span>
+                                <span>Paid: <strong style="color: #047857;">BDT {{ sale.effective_paid_amount|floatformat:2 }}</strong></span>
+                                <span style="margin: 0 2px;">&bull;</span>
+                                <span>Due: <strong style="color: #dc2626;">BDT {{ sale.due_amount|floatformat:2 }}</strong></span>
                             </div>
                             {% endif %}
                         </div>
                     </td>
-                    <td style="text-align: right;">
-                        <div style="display: inline-flex; gap: 5px; flex-wrap: nowrap; justify-content: flex-end;">
-                            <button type="button" class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' sale.pk %}')" title="Print directly to printer" style="padding: 5px 9px; font-size: 12px;">🖨️</button>
-                            <a class="button" href="{% url 'sales:receipt_print' sale.pk %}" target="_blank" title="View receipt" style="padding: 5px 9px; font-size: 12px;">View</a>
-                            <a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" title="Download PDF" style="padding: 5px 9px; font-size: 12px;">PDF</a>
+                    <td style="text-align: right; white-space: nowrap;">
+                        <div style="display: inline-flex; gap: 5px; justify-content: flex-end;">
+                            <button type="button" class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' sale.pk %}')" title="Print directly to printer" style="padding: 5px 9px; font-size: 12px; font-weight: 700;">🖨️</button>
+                            <a class="button" href="{% url 'sales:receipt_print' sale.pk %}" target="_blank" title="View A4 invoice" style="padding: 5px 9px; font-size: 12px; font-weight: 600; background: #ffffff;">Receipt</a>
+                            <a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" title="Download PDF invoice" style="padding: 5px 9px; font-size: 12px; font-weight: 600; background: #ffffff;">PDF</a>
                             {% if sale.customer_name %}
-                            <a class="button" href="{% url 'sales:customer_statement' %}?customer={{ sale.customer_name|urlencode }}" target="_blank" title="Customer Statement" style="padding: 5px 9px; font-size: 12px; background: #f8fafc;">Ledger</a>
+                            <a class="button" href="{% url 'sales:customer_statement' %}?customer={{ sale.customer_name|urlencode }}" target="_blank" title="Customer account ledger" style="padding: 5px 9px; font-size: 12px; font-weight: 600; background: #f8fafc;">Ledger</a>
                             {% endif %}
                         </div>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--muted);">No sales found matching your criteria.</td></tr>
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 48px 20px; color: #64748b;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🧾</div>
+                        <strong style="font-size: 14px; color: #0f172a;">No sales orders match your criteria.</strong>
+                        <p style="margin: 4px 0 16px; font-size: 12.5px;">Try clearing filters or search terms, or create a new sale.</p>
+                        <a href="{% url 'sales:create' %}" class="button primary" style="font-weight: 700;">⚡ Create New Sale</a>
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </section>
 
+<!-- Direct Print & Batch Scripts -->
 <script>
     function printReceipt(url) {
         let iframe = document.getElementById('print-receipt-frame');
@@ -198,7 +424,7 @@
         iframe.src = url;
     }
 
-    // Checkbox and batch selection handling
+    // Checkbox selection handling
     const selectAll = document.getElementById('select-all');
     const checkboxes = document.querySelectorAll('.sale-checkbox');
     const batchActions = document.getElementById('batch-actions');
@@ -251,4 +477,3 @@
     {% endif %}
 </script>
 {% endblock %}
-

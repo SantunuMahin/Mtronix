@@ -15,5 +15,6 @@ urlpatterns = [
     path('statement/pdf/', views.customer_statement_pdf, name='customer_statement_pdf'),
     path('statement/pdf/', views.customer_statement_pdf, name='statement_pdf'),
     path('report/pdf/', views.sales_report_pdf, name='report_pdf'),
+    path('customer-lookup/', views.customer_lookup_api, name='customer_lookup'),
 ]
 

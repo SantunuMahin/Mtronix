@@ -39,3 +39,10 @@ class PurchasePageTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Purchase.objects.count(), 1)
         self.assertEqual(Inventory.objects.get(product=self.product).quantity, 5)
+
+        from inventory.models import StockMovement
+        sm = StockMovement.objects.filter(product=self.product).first()
+        self.assertIsNotNone(sm)
+        self.assertEqual(sm.movement_type, StockMovement.MOVEMENT_PURCHASE)
+        self.assertEqual(sm.quantity, 5)
+        self.assertEqual(sm.user, self.user)

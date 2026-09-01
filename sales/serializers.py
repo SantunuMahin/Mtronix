@@ -38,7 +38,9 @@ class SaleSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
+        request = self.context.get('request')
+        user = request.user if request and request.user.is_authenticated else None
         try:
-            return InventoryService.create_sale(items=items_data, **validated_data)
+            return InventoryService.create_sale(items=items_data, user=user, **validated_data)
         except ValueError as exc:
             raise serializers.ValidationError({'items': str(exc)}) from exc

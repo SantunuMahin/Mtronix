@@ -18,6 +18,16 @@ class ProductSerializerTests(TestCase):
 
         self.assertEqual(ProductSerializer(product).data['current_stock'], 0)
 
+    def test_automatic_inventory_creation_on_product_create(self):
+        product = Product.objects.create(
+            name='Resistor 10k',
+            sku='RES-10K',
+            purchase_price='0.05',
+            selling_price='0.10',
+        )
+        self.assertTrue(hasattr(product, 'inventory'))
+        self.assertEqual(product.inventory.quantity, 0)
+
 
 class ProductPageTests(TestCase):
     def setUp(self):

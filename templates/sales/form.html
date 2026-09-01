@@ -399,24 +399,26 @@
                 <!-- Customer + quick search -->
                 <div class="panel se-customer-panel">
                     <div class="se-cust-grid">
-                        <div class="se-cust-field">
-                            <label>Customer Name <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
+                        <div class="se-cust-field" style="position: relative;">
+                            <label for="id_customer_name">Customer Name <span style="color: var(--muted); font-weight: 400;">(Search or Enter)</span></label>
                             {{ form.customer_name }}
+                            <div class="se-dropdown" id="cust-name-dropdown" hidden style="max-height: 220px; z-index: 350;"></div>
                             {% for error in form.customer_name.errors %}
                                 <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
                             {% endfor %}
                         </div>
 
-                        <div class="se-cust-field">
-                            <label>Phone Number <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
+                        <div class="se-cust-field" style="position: relative;">
+                            <label for="id_customer_phone">Phone Number <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
                             {{ form.customer_phone }}
+                            <div class="se-dropdown" id="cust-phone-dropdown" hidden style="max-height: 220px; z-index: 350;"></div>
                             {% for error in form.customer_phone.errors %}
                                 <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
                             {% endfor %}
                         </div>
 
                         <div class="se-cust-field">
-                            <label>Address / Area <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
+                            <label for="id_customer_address">Address / Area <span style="color: var(--muted); font-weight: 400;">(optional)</span></label>
                             {{ form.customer_address }}
                             {% for error in form.customer_address.errors %}
                                 <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
@@ -424,7 +426,7 @@
                         </div>
 
                         <div class="se-cust-field">
-                            <label>Payment Status</label>
+                            <label for="id_payment_status">Payment Status</label>
                             {{ form.payment_status }}
                             {% for error in form.payment_status.errors %}
                                 <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
@@ -444,6 +446,39 @@
                             {% for error in form.paid_amount.errors %}
                                 <strong style="color: #991b1b; font-size: 12px; display: block;">{{ error }}</strong>
                             {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- ── Returning Customer History Panel ── -->
+                    <div id="customer-history-box" style="display: none; margin-bottom: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 18px;">⭐️</span>
+                                <div>
+                                    <strong style="color: #065f46; font-size: 13.5px;" id="ch-name">Returning Customer</strong>
+                                    <div style="font-size: 11.5px; color: #047857;" id="ch-meta">0 previous purchases &bull; Total spent: BDT 0.00</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                <span id="ch-due-badge" style="display: none; font-size: 11px; font-weight: 700; background: #fee2e2; color: #991b1b; padding: 3px 8px; border-radius: 6px; border: 1px solid #fca5a5;"></span>
+                                <a id="ch-statement-link" href="#" target="_blank" class="button" style="padding: 4px 10px; font-size: 11.5px; background: #ffffff; border-color: #cbd5e1; text-decoration: none;">📄 Account Statement</a>
+                                <button type="button" id="ch-toggle-invoices-btn" class="button" style="padding: 4px 10px; font-size: 11.5px; background: #ffffff; border-color: #cbd5e1;">Past Invoices ▾</button>
+                            </div>
+                        </div>
+
+                        <!-- Previous Bought Items with 1-click Re-order -->
+                        <div id="ch-items-container" style="border-top: 1px dashed #86efac; padding-top: 10px; margin-top: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 12px; font-weight: 700; color: #166534;">📦 Previous Buy Details (Click "+ Add to Sale" to re-order):</span>
+                                <small style="font-size: 11px; color: #15803d;">Quick 1-Click Reorder</small>
+                            </div>
+                            <div id="ch-items-list" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                        </div>
+
+                        <!-- Collapsible Past Invoices Breakdown -->
+                        <div id="ch-invoices-container" style="display: none; border-top: 1px dashed #86efac; padding-top: 10px; margin-top: 10px;">
+                            <span style="font-size: 12px; font-weight: 700; color: #166534; display: block; margin-bottom: 6px;">Recent Purchase Invoices:</span>
+                            <div id="ch-invoices-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
                         </div>
                     </div>
 
@@ -607,6 +642,7 @@
 </template>
 
 {{ products_catalog|json_script:"products-catalog-data" }}
+{{ customers_catalog|json_script:"customers-catalog-data" }}
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -1211,9 +1247,255 @@ document.addEventListener('DOMContentLoaded', () => {
         calculateTotals();
     });
 
+    // ── Customer Autocomplete & Previous Buy Details ─────────────────────────
+    const customersCatalog = JSON.parse(document.getElementById('customers-catalog-data')?.textContent || '[]');
+    const custNameInput    = document.getElementById('id_customer_name');
+    const custPhoneInput   = document.getElementById('id_customer_phone');
+    const custAddressInput = document.getElementById('id_customer_address');
+    const custNameDrop     = document.getElementById('cust-name-dropdown');
+    const custPhoneDrop    = document.getElementById('cust-phone-dropdown');
+    const custHistoryBox   = document.getElementById('customer-history-box');
+    const chNameEl         = document.getElementById('ch-name');
+    const chMetaEl         = document.getElementById('ch-meta');
+    const chDueBadge       = document.getElementById('ch-due-badge');
+    const chStmtLink       = document.getElementById('ch-statement-link');
+    const chItemsList      = document.getElementById('ch-items-list');
+    const chInvoicesList   = document.getElementById('ch-invoices-list');
+    const chToggleInvBtn   = document.getElementById('ch-toggle-invoices-btn');
+    const chInvoicesBox    = document.getElementById('ch-invoices-container');
+
+    let currentCustomerData = null;
+
+    if (chToggleInvBtn && chInvoicesBox) {
+        chToggleInvBtn.addEventListener('click', () => {
+            const isHidden = chInvoicesBox.style.display === 'none';
+            chInvoicesBox.style.display = isHidden ? 'block' : 'none';
+            chToggleInvBtn.textContent = isHidden ? 'Hide Invoices ▴' : 'Past Invoices ▾';
+        });
+    }
+
+    function searchLocalCustomers(query) {
+        const q = (query || '').trim().toLowerCase();
+        if (!q) return [];
+        return customersCatalog.filter(c => 
+            (c.customer_name && c.customer_name.toLowerCase().includes(q)) ||
+            (c.customer_phone && c.customer_phone.toLowerCase().includes(q))
+        ).slice(0, 8);
+    }
+
+    function renderCustomerList(container, list, onSelect) {
+        container.innerHTML = '';
+        if (!list.length) {
+            container.hidden = true;
+            return;
+        }
+        list.forEach(c => {
+            const div = document.createElement('div');
+            div.className = 'se-dropdown-result';
+            div.style.padding = '8px 12px';
+            const hasDue = (c.total_due > 0);
+            const dueChip = hasDue ? `<span style="font-size: 10px; font-weight: 700; color: #991b1b; background: #fee2e2; padding: 1px 6px; border-radius: 4px;">Due: ${money(c.total_due)}</span>` : '';
+            div.innerHTML = `
+                <div class="se-dr-left">
+                    <div style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                        <span>👤 ${esc(c.customer_name || 'Customer')}</span>
+                        ${dueChip}
+                    </div>
+                    <span style="font-size: 11px; color: var(--muted);">📞 ${esc(c.customer_phone || 'No phone')} ${c.customer_address ? '&bull; 📍 ' + esc(c.customer_address) : ''}</span>
+                </div>
+                <div class="se-dr-right">
+                    <span style="font-size: 11.5px; font-weight: 700; color: #047857;">${c.total_orders} order${c.total_orders > 1 ? 's' : ''}</span>
+                    <span style="font-size: 10.5px; color: var(--muted);">${money(c.total_spent)}</span>
+                </div>
+            `;
+            div.addEventListener('mousedown', e => {
+                e.preventDefault();
+                onSelect(c);
+            });
+            container.appendChild(div);
+        });
+        container.hidden = false;
+    }
+
+    function selectCustomer(c) {
+        if (custNameInput && c.customer_name) custNameInput.value = c.customer_name;
+        if (custPhoneInput && c.customer_phone) custPhoneInput.value = c.customer_phone;
+        if (custAddressInput && c.customer_address && !custAddressInput.value) custAddressInput.value = c.customer_address;
+        hideDropdown(custNameDrop);
+        hideDropdown(custPhoneDrop);
+        displayCustomerProfile(c);
+    }
+
+    function displayCustomerProfile(c) {
+        if (!c || !c.customer_name) {
+            if (custHistoryBox) custHistoryBox.style.display = 'none';
+            currentCustomerData = null;
+            return;
+        }
+        currentCustomerData = c;
+        if (custHistoryBox) custHistoryBox.style.display = 'block';
+
+        if (chNameEl) chNameEl.textContent = `⭐️ Returning Customer: ${c.customer_name}`;
+        if (chMetaEl) chMetaEl.textContent = `${c.total_orders} previous order${c.total_orders > 1 ? 's' : ''} &bull; Total spent: ${money(c.total_spent)} (Last bought: ${c.last_order_date || 'Recently'})`;
+
+        if (chDueBadge) {
+            if (c.total_due > 0) {
+                chDueBadge.style.display = 'inline-block';
+                chDueBadge.textContent = `⚠️ Outstanding Balance: ${money(c.total_due)}`;
+            } else {
+                chDueBadge.style.display = 'none';
+            }
+        }
+
+        if (chStmtLink) {
+            chStmtLink.href = `/sales/statement/?customer=${encodeURIComponent(c.customer_name)}`;
+        }
+
+        // Render previous bought items
+        if (chItemsList) {
+            chItemsList.innerHTML = '';
+            const distinctItems = new Map();
+            (c.recent_sales || []).forEach(s => {
+                (s.items || []).forEach(it => {
+                    const k = it.is_custom ? `custom_${it.product_name}` : `prod_${it.product_id}`;
+                    if (!distinctItems.has(k)) {
+                        distinctItems.set(k, it);
+                    }
+                });
+            });
+
+            if (!distinctItems.size) {
+                chItemsList.innerHTML = '<span style="font-size: 11.5px; color: #166534; font-style: italic;">No previous item details found.</span>';
+            } else {
+                distinctItems.forEach(item => {
+                    const chip = document.createElement('div');
+                    chip.style.cssText = 'display: inline-flex; align-items: center; gap: 8px; background: #ffffff; border: 1px solid #86efac; border-radius: 8px; padding: 4px 10px; font-size: 12px;';
+                    chip.innerHTML = `
+                        <div>
+                            <strong style="color: #0f172a; display: block; line-height: 1.2;">${esc(item.product_name)}</strong>
+                            <span style="font-size: 10.5px; color: #64748b;">${item.sku ? 'SKU: ' + esc(item.sku) + ' &bull; ' : ''}${money(item.unit_price)}</span>
+                        </div>
+                        <button type="button" style="padding: 3px 8px; font-size: 11px; font-weight: 700; background: #0f766e; color: #fff; border: none; border-radius: 5px; cursor: pointer;">+ Add to Sale</button>
+                    `;
+                    chip.querySelector('button').addEventListener('click', () => {
+                        addItemFromHistory(item);
+                    });
+                    chItemsList.appendChild(chip);
+                });
+            }
+        }
+
+        // Render recent past sales list
+        if (chInvoicesList) {
+            chInvoicesList.innerHTML = '';
+            (c.recent_sales || []).forEach(s => {
+                const sRow = document.createElement('div');
+                sRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #ffffff; border: 1px solid #dcfce7; border-radius: 6px; padding: 6px 10px; font-size: 11.5px;';
+                const sStatus = s.payment_status === 'PAID' ? '<span style="color: #047857; font-weight: 700;">✓ PAID</span>' : (s.payment_status === 'PARTIAL' ? `<span style="color: #b45309; font-weight: 700;">🌓 Due: ${money(s.due_amount)}</span>` : `<span style="color: #dc2626; font-weight: 700;">⏳ Due: ${money(s.due_amount)}</span>`);
+                sRow.innerHTML = `
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <a href="/sales/${s.id}/receipt/" target="_blank" style="font-weight: 700; color: #0f766e; text-decoration: none; font-family: monospace;">#${esc(s.code || s.id)}</a>
+                        <span style="color: #64748b;">${esc(s.date)}</span>
+                        <span style="color: #334155; font-weight: 600;">${money(s.total_amount)}</span>
+                        ${sStatus}
+                    </div>
+                    <a href="/sales/${s.id}/receipt/" target="_blank" class="button" style="padding: 2px 7px; font-size: 10.5px; text-decoration: none;">View</a>
+                `;
+                chInvoicesList.appendChild(sRow);
+            });
+        }
+    }
+
+    function addItemFromHistory(item) {
+        let row;
+        if (!item.is_custom && item.product_id && byId.has(String(item.product_id))) {
+            const prod = byId.get(String(item.product_id));
+            row = findEmptyRow() || addEmptyRow();
+            const index = row.dataset.index;
+            selectProductForRow(index, prod);
+        } else {
+            row = findEmptyRow() || addEmptyRow();
+            const index = row.dataset.index;
+            selectCustomItemForRow(index, item.product_name || 'Custom Item');
+        }
+        const qtyInp = row.querySelector('input[name$="-quantity"]');
+        const priceInp = row.querySelector('input[name$="-unit_price"]');
+        if (qtyInp && item.quantity) qtyInp.value = item.quantity;
+        if (priceInp && item.unit_price) priceInp.value = parseFloat(item.unit_price).toFixed(2);
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        calculateTotals();
+    }
+
+    // Dynamic search debounce
+    let custSearchTimer = null;
+    function triggerCustomerSearch(query, dropdown, onSelect) {
+        const q = (query || '').trim();
+        if (q.length < 2) {
+            hideDropdown(dropdown);
+            if (!q && (!custNameInput.value.trim() && !custPhoneInput.value.trim())) {
+                displayCustomerProfile(null);
+            }
+            return;
+        }
+
+        // Check local catalog first
+        const localMatches = searchLocalCustomers(q);
+        if (localMatches.length > 0) {
+            renderCustomerList(dropdown, localMatches, onSelect);
+            const exact = localMatches.find(c => (c.customer_name && c.customer_name.toLowerCase() === q.toLowerCase()) || (c.customer_phone && c.customer_phone === q));
+            if (exact) displayCustomerProfile(exact);
+        }
+
+        clearTimeout(custSearchTimer);
+        custSearchTimer = setTimeout(() => {
+            fetch(`/sales/customer-lookup/?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.results && data.results.length > 0) {
+                        renderCustomerList(dropdown, data.results, onSelect);
+                        const exact = data.results.find(c => (c.customer_name && c.customer_name.toLowerCase() === q.toLowerCase()) || (c.customer_phone && c.customer_phone === q));
+                        if (exact) displayCustomerProfile(exact);
+                    }
+                })
+                .catch(() => {});
+        }, 200);
+    }
+
+    if (custNameInput && custNameDrop) {
+        custNameInput.addEventListener('input', () => {
+            triggerCustomerSearch(custNameInput.value, custNameDrop, selectCustomer);
+        });
+        custNameInput.addEventListener('focus', () => {
+            if (custNameInput.value.trim().length >= 2) {
+                triggerCustomerSearch(custNameInput.value, custNameDrop, selectCustomer);
+            }
+        });
+    }
+
+    if (custPhoneInput && custPhoneDrop) {
+        custPhoneInput.addEventListener('input', () => {
+            triggerCustomerSearch(custPhoneInput.value, custPhoneDrop, selectCustomer);
+        });
+        custPhoneInput.addEventListener('focus', () => {
+            if (custPhoneInput.value.trim().length >= 2) {
+                triggerCustomerSearch(custPhoneInput.value, custPhoneDrop, selectCustomer);
+            }
+        });
+    }
+
+    // Auto check if pre-filled customer name exists on page load
+    if (custNameInput && custNameInput.value.trim()) {
+        const initialMatches = searchLocalCustomers(custNameInput.value.trim());
+        if (initialMatches.length > 0) displayCustomerProfile(initialMatches[0]);
+    }
+
     // ── Click outside closes dropdowns ──────────────────────────────────────
     document.addEventListener('click', e => {
         if (!e.target.closest('#quick-wrap')) hideDropdown(quickDrop);
+        if (!e.target.closest('.se-cust-field')) {
+            if (custNameDrop) hideDropdown(custNameDrop);
+            if (custPhoneDrop) hideDropdown(custPhoneDrop);
+        }
         document.querySelectorAll('.se-product-wrap').forEach(wrap => {
             if (!wrap.contains(e.target)) {
                 const dd = wrap.querySelector('.product-dropdown');

@@ -2,16 +2,176 @@
 
 {% block title %}{{ title }} - Mtronix{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
-{% block page_subtitle %}{{ inventory.product.name }} currently has {{ inventory.quantity }} units in stock.{% endblock %}
+{% block page_subtitle %}Adjust on-hand inventory levels for {{ inventory.product.name }}. All adjustments are recorded in the audit log.{% endblock %}
+
+{% block header_action %}
+<a class="button" href="{% url 'inventory:list' %}" style="background: var(--surface); border: 1px solid var(--border); font-weight: 600; font-size: 13px;">
+    &larr; Back to Inventory
+</a>
+{% endblock %}
 
 {% block content %}
-<section class="panel form-panel">
+<style>
+.adjust-card {
+    max-width: 620px;
+    margin: 0 auto;
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+}
+.adjust-summary {
+    background: var(--surface-2, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.calc-preview {
+    background: #f0fdfa;
+    border: 1px solid #ccfbf1;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #0f766e;
+    font-weight: 600;
+}
+.reason-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+    margin-bottom: 12px;
+}
+.reason-chip {
+    font-size: 11.5px;
+    background: var(--surface-2, #f1f5f9);
+    border: 1px solid var(--border, #cbd5e1);
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.reason-chip:hover {
+    background: var(--primary, #0f766e);
+    color: #fff;
+    border-color: var(--primary, #0f766e);
+}
+</style>
+
+<div class="adjust-card">
+    <div class="adjust-summary">
+        <div>
+            <strong style="font-size: 15px; color: var(--text); display: block;">{{ inventory.product.name }}</strong>
+            <span style="font-size: 12px; color: var(--muted); font-family: monospace;">SKU: {{ inventory.product.sku|default:"—" }}</span>
+        </div>
+        <div style="text-align: right;">
+            <span style="font-size: 11.5px; color: var(--muted); display: block;">Current Stock</span>
+            <strong style="font-size: 20px; color: var(--text);">{{ inventory.quantity }} <span style="font-size: 13px; font-weight: normal; color: var(--muted);">Units</span></strong>
+        </div>
+    </div>
+
+    <!-- Live Calculation Preview Box -->
+    <div class="calc-preview" id="calcPreview">
+        <span>Current: <strong>{{ inventory.quantity }} units</strong></span>
+        <span>Operation: <strong>{% if mode == 'ADD' %}+ Stock In{% else %}− Stock Out{% endif %}</strong></span>
+        <span>Resulting Stock: <strong id="newStockCalc">{{ inventory.quantity }} units</strong></span>
+    </div>
+
     <form method="post" novalidate>
-        {% include 'includes/form.html' %}
-        <div class="form-actions">
-            <a class="button" href="{% url 'inventory:list' %}">Cancel</a>
-            <button class="button primary" type="submit">{{ action_label }}</button>
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+        <div style="background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13px;">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <!-- Quantity Field -->
+        <div style="margin-bottom: 18px;">
+            <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
+                Quantity to {% if mode == 'ADD' %}Add (+){% else %}Deduct (−){% endif %} *
+            </label>
+            <input type="number" name="quantity" id="id_quantity" value="{{ form.quantity.value|default:'1' }}" min="1" max="{% if mode == 'REMOVE' %}{{ inventory.quantity }}{% endif %}" class="input" style="width: 100%; box-sizing: border-box; font-size: 15px; padding: 10px 12px; font-weight: 700;" required autofocus>
+            {% if form.quantity.errors %}
+            <div style="color: #dc2626; font-size: 12px; margin-top: 4px;">{{ form.quantity.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Reason Field & Quick Suggestion Chips -->
+        <div style="margin-bottom: 18px;">
+            <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
+                Reason for Adjustment
+            </label>
+            <input type="text" name="reason" id="id_reason" value="{{ form.reason.value|default:'' }}" placeholder="Select a preset below or type a custom reason..." class="input" style="width: 100%; box-sizing: border-box; font-size: 13px; padding: 8px 12px;">
+            
+            <div class="reason-chips">
+                {% for val, lbl in reason_choices %}
+                <button type="button" class="reason-chip" onclick="document.getElementById('id_reason').value = '{{ val }}';">
+                    {{ lbl }}
+                </button>
+                {% endfor %}
+            </div>
+            {% if form.reason.errors %}
+            <div style="color: #dc2626; font-size: 12px; margin-top: 4px;">{{ form.reason.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Optional Notes Field -->
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
+                Additional Notes & Reference (Optional)
+            </label>
+            <textarea name="notes" id="id_notes" rows="3" placeholder="Batch number, damaged item details, invoice reference..." class="input" style="width: 100%; box-sizing: border-box; font-size: 13px; padding: 8px 12px; font-family: inherit;">{{ form.notes.value|default:'' }}</textarea>
+            {% if form.notes.errors %}
+            <div style="color: #dc2626; font-size: 12px; margin-top: 4px;">{{ form.notes.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border, #e2e8f0); padding-top: 18px;">
+            <a class="button" href="{% url 'inventory:list' %}" style="padding: 10px 18px; font-size: 13px;">Cancel</a>
+            <button class="button primary" type="submit" style="padding: 10px 22px; font-size: 13px; font-weight: 700; {% if mode == 'REMOVE' %}background: #dc2626; border-color: #b91c1c; box-shadow: 0 2px 8px rgba(220,38,38,0.25);{% endif %}">
+                {{ action_label }}
+            </button>
         </div>
     </form>
-</section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const qtyInput = document.getElementById('id_quantity');
+    const calcOutput = document.getElementById('newStockCalc');
+    const currStock = {{ inventory.quantity }};
+    const mode = '{{ mode }}';
+
+    function updateCalc() {
+        const val = parseInt(qtyInput.value, 10) || 0;
+        let newStock = 0;
+        if (mode === 'ADD') {
+            newStock = currStock + val;
+        } else {
+            newStock = currStock - val;
+        }
+        calcOutput.textContent = newStock + ' units';
+        if (newStock < 0) {
+            calcOutput.style.color = '#dc2626';
+        } else {
+            calcOutput.style.color = '#0f766e';
+        }
+    }
+
+    qtyInput.addEventListener('input', updateCalc);
+    updateCalc();
+});
+</script>
 {% endblock %}

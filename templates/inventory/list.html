@@ -1,51 +1,317 @@
 {% extends 'base.html' %}
 
-{% block title %}Inventory - Mtronix{% endblock %}
-{% block page_title %}Inventory{% endblock %}
-{% block page_subtitle %}Monitor stock levels, print inventory reports, and adjust stock.{% endblock %}
+{% block title %}Inventory & Stock Control - Mtronix{% endblock %}
+{% block page_title %}Inventory & Stock Control{% endblock %}
+{% block page_subtitle %}Real-time stock valuation, category filtering, reorder alerts, and stock adjustments.{% endblock %}
 
 {% block header_action %}
-<div style="display: flex; gap: 8px; flex-wrap: wrap;">
-    <a class="button primary" href="{% url 'inventory:report_pdf' %}?type=stock" target="_blank" title="Print complete stock inventory">🖨️ Print Stock Summary</a>
+<div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <a class="button" href="{% url 'inventory:logs' %}" style="background: var(--surface); border: 1px solid var(--border); font-weight: 600; font-size: 13px;">
+        📝 Stock Movement Audit Logs
+    </a>
+    <a class="button primary" href="{% url 'inventory:report_pdf' %}?type=stock" target="_blank" style="font-weight: 700; font-size: 13px; box-shadow: 0 4px 12px rgba(15,118,110,0.25);">
+        🖨️ Full Stock PDF Report
+    </a>
 </div>
 {% endblock %}
 
 {% block content %}
-<section class="panel">
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <span style="color: var(--muted); font-size: 14px; font-weight: bold;">Print Reports:</span>
-            <a class="button" href="{% url 'inventory:report_pdf' %}?type=new_products&period=today" target="_blank" title="Print products added today">📄 Today's New Products</a>
-            <a class="button" href="{% url 'inventory:report_pdf' %}?type=updated_stock&period=today" target="_blank" title="Print products with stock updated today">📊 Today's Stock Updates</a>
-            <a class="button" href="{% url 'inventory:report_pdf' %}?type=stock" target="_blank" title="Print all active stock">📦 All Stock PDF</a>
+<style>
+/* ── Inventory Styles ─────────────────────────────────────────── */
+.inv-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 22px;
+}
+.inv-kpi-card {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.inv-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.05);
+}
+.inv-kpi-card.teal { border-left: 4px solid #0f766e; }
+.inv-kpi-card.blue { border-left: 4px solid #2563eb; }
+.inv-kpi-card.amber { border-left: 4px solid #d97706; }
+.inv-kpi-card.emerald { border-left: 4px solid #059669; }
+
+.inv-kpi-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted, #64748b);
+    display: flex;
+    justify-content: space-between;
+}
+.inv-kpi-val {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text, #0f172a);
+    margin: 8px 0 4px;
+}
+.inv-kpi-sub {
+    font-size: 11.5px;
+    color: var(--muted, #64748b);
+}
+
+/* Stock Progress Bar in row */
+.stock-meter-bg {
+    width: 90px;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.stock-meter-fill {
+    height: 100%;
+    border-radius: 4px;
+}
+.meter-ok { background: #10b981; }
+.meter-low { background: #f59e0b; }
+.meter-out { background: #ef4444; }
+
+/* Filter Toolbar */
+.filter-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.search-box-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 260px;
+}
+.search-box-wrap input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 38px;
+    padding: 0 12px 0 34px;
+    border: 1px solid var(--border, #cbd5e1);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--surface, #ffffff);
+}
+.search-box-wrap::before {
+    content: "🔍";
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    opacity: 0.6;
+    pointer-events: none;
+}
+</style>
+
+<!-- ── Store Inventory Summary KPI Cards ── -->
+<section class="inv-kpi-grid">
+    <article class="inv-kpi-card teal">
+        <div class="inv-kpi-title">
+            <span>Total In Stock</span>
+            <span>📦</span>
         </div>
+        <div class="inv-kpi-val">{{ total_units_count }} <span style="font-size: 14px; font-weight: normal; color: var(--muted);">Units</span></div>
+        <div class="inv-kpi-sub">Across <strong>{{ total_products_count }}</strong> registered products</div>
+    </article>
+
+    <article class="inv-kpi-card blue">
+        <div class="inv-kpi-title">
+            <span>Stock Valuation</span>
+            <span>💰</span>
+        </div>
+        <div class="inv-kpi-val">BDT {{ total_retail_valuation|floatformat:2 }}</div>
+        <div class="inv-kpi-sub">Cost value: BDT {{ total_cost_valuation|floatformat:2 }}</div>
+    </article>
+
+    <article class="inv-kpi-card emerald">
+        <div class="inv-kpi-title">
+            <span>Potential Profit</span>
+            <span>📈</span>
+        </div>
+        <div class="inv-kpi-val" style="color: #059669;">+BDT {{ potential_profit|floatformat:2 }}</div>
+        <div class="inv-kpi-sub">Expected margin upon sale</div>
+    </article>
+
+    <article class="inv-kpi-card amber">
+        <div class="inv-kpi-title">
+            <span>Stock Health & Alerts</span>
+            <span>⚠️</span>
+        </div>
+        <div class="inv-kpi-val" style="color: {% if low_stock_count > 0 or out_of_stock_count > 0 %}#d97706{% else %}#059669{% endif %};">
+            {{ low_stock_count }} Low &bull; {{ out_of_stock_count }} Out
+        </div>
+        <div class="inv-kpi-sub">
+            <span style="color: #059669; font-weight: 600;">{{ healthy_stock_count }} adequately stocked</span>
+        </div>
+    </article>
+</section>
+
+<!-- ── Main Inventory Table Panel ── -->
+<section class="panel" style="border-radius: 12px;">
+
+    <!-- Filter & Search Controls Form -->
+    <form method="get" class="filter-toolbar">
+        <div class="search-box-wrap">
+            <input type="text" name="q" value="{{ query }}" placeholder="Search by product name, SKU, or group..." autocomplete="off">
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <!-- Group Filter Dropdown -->
+            <select name="group" onchange="this.form.submit()" style="height: 38px; padding: 0 10px; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; font-family: inherit; font-size: 13px; background: var(--surface, #ffffff);">
+                <option value="">— All Product Groups —</option>
+                {% for g in product_groups %}
+                <option value="{{ g.name }}" {% if group_filter == g.name %}selected{% endif %}>📁 {{ g.name }}</option>
+                {% endfor %}
+            </select>
+
+            <!-- Sorting Dropdown -->
+            <select name="sort" onchange="this.form.submit()" style="height: 38px; padding: 0 10px; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; font-family: inherit; font-size: 13px; background: var(--surface, #ffffff);">
+                <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Sort: Name (A to Z)</option>
+                <option value="qty_desc" {% if sort_by == 'qty_desc' %}selected{% endif %}>Sort: Highest Stock First</option>
+                <option value="qty_asc" {% if sort_by == 'qty_asc' %}selected{% endif %}>Sort: Lowest Stock First</option>
+                <option value="val_desc" {% if sort_by == 'val_desc' %}selected{% endif %}>Sort: Highest Valuation First</option>
+            </select>
+
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <button class="button primary" type="submit" style="height: 38px; padding: 0 14px;">Filter</button>
+            {% if query or group_filter or status_filter != 'all' or sort_by != 'name' %}
+            <a class="button" href="{% url 'inventory:list' %}" style="height: 38px; padding: 0 12px;">Clear</a>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Stock Status Tabs & PDF Reports Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border, #e2e8f0); padding-bottom: 12px; flex-wrap: wrap;">
+        <!-- Status Tabs -->
         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-            <span style="color: var(--muted); font-size: 13px;">Period:</span>
-            <a class="button" href="{% url 'inventory:report_pdf' %}?type=new_products&period=month" target="_blank" style="padding: 6px 10px; font-size: 12px;">This Month's New</a>
-            <a class="button" href="{% url 'inventory:report_pdf' %}?type=updated_stock&period=month" target="_blank" style="padding: 6px 10px; font-size: 12px;">This Month's Updates</a>
+            <span style="font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-right: 4px;">Status:</span>
+            <a href="?q={{ query }}&group={{ group_filter }}&sort={{ sort_by }}&status=all" class="button {% if status_filter == 'all' %}primary{% endif %}" style="padding: 4px 11px; font-size: 12px; height: auto;">
+                All Stock ({{ total_products_count }})
+            </a>
+            <a href="?q={{ query }}&group={{ group_filter }}&sort={{ sort_by }}&status=low" class="button {% if status_filter == 'low' %}primary{% endif %}" style="padding: 4px 11px; font-size: 12px; height: auto;">
+                ⚠️ Low Stock ({{ low_stock_count }})
+            </a>
+            <a href="?q={{ query }}&group={{ group_filter }}&sort={{ sort_by }}&status=out" class="button {% if status_filter == 'out' %}primary{% endif %}" style="padding: 4px 11px; font-size: 12px; height: auto;">
+                🚫 Out of Stock ({{ out_of_stock_count }})
+            </a>
+            <a href="?q={{ query }}&group={{ group_filter }}&sort={{ sort_by }}&status=in_stock" class="button {% if status_filter == 'in_stock' %}primary{% endif %}" style="padding: 4px 11px; font-size: 12px; height: auto;">
+                ✓ Adequate Stock ({{ healthy_stock_count }})
+            </a>
+        </div>
+
+        <!-- Periodic PDF Reports -->
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            <span style="color: var(--muted); font-size: 12px; font-weight: 600;">Reports:</span>
+            <a class="button" href="{% url 'inventory:report_pdf' %}?type=stock" target="_blank" style="padding: 4px 8px; font-size: 11.5px; height: auto;">📦 All Stock PDF</a>
+            <a class="button" href="{% url 'inventory:report_pdf' %}?type=updated_stock&period=today" target="_blank" style="padding: 4px 8px; font-size: 11.5px; height: auto;">📊 Today's Updates</a>
+            <a class="button" href="{% url 'inventory:report_pdf' %}?type=new_products&period=today" target="_blank" style="padding: 4px 8px; font-size: 11.5px; height: auto;">✨ New Products</a>
         </div>
     </div>
 
+    <!-- Inventory Data Table -->
     <div class="table-wrap">
         <table>
             <thead>
-                <tr><th>Product</th><th>SKU</th><th>Quantity</th><th>Low Stock At</th><th>Updated</th><th></th></tr>
+                <tr>
+                    <th>Product & Group</th>
+                    <th>SKU</th>
+                    <th>Purchase / Selling Price</th>
+                    <th style="text-align: center;">Stock Level & Threshold</th>
+                    <th style="text-align: right;">Total Retail Value</th>
+                    <th style="text-align: right;">Updated</th>
+                    <th style="text-align: right;">Stock Adjustments</th>
+                </tr>
             </thead>
             <tbody>
                 {% for item in inventory %}
                 <tr>
-                    <td>{{ item.product.name }}</td>
-                    <td>{{ item.product.sku|default:"—" }}</td>
-                    <td><span class="badge">{{ item.quantity }}</span></td>
-                    <td>{{ item.product.low_stock_threshold }}</td>
-                    <td>{{ item.updated_at|date:"M d, Y h:i A" }}</td>
-                    <td class="actions">
-                        <a class="button" href="{% url 'inventory:add_stock' item.pk %}">Add</a>
-                        <a class="button" href="{% url 'inventory:remove_stock' item.pk %}">Remove</a>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <strong style="font-size: 13.5px; color: var(--text);">{{ item.product.name }}</strong>
+                            {% if item.product.group %}
+                            <span style="font-size: 11px; color: #2563eb; background: #eff6ff; padding: 1px 6px; border-radius: 4px; display: inline-block; width: fit-content; font-weight: 600;">📁 {{ item.product.group.name }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <span style="font-family: monospace; font-size: 12px; color: var(--muted); background: var(--surface-2); padding: 2px 6px; border-radius: 4px;">
+                            {{ item.product.sku|default:"—" }}
+                        </span>
+                    </td>
+                    <td>
+                        <strong style="font-size: 13.5px; color: #0f766e;">BDT {{ item.product.selling_price }}</strong>
+                    </td>
+                    <td style="text-align: center;">
+                        <div style="display: inline-flex; flex-direction: column; align-items: center;">
+                            {% if item.quantity == 0 %}
+                            <span class="badge" style="background: #fee2e2; color: #991b1b; font-weight: 700; font-size: 11.5px; border: 1px solid #fca5a5;">
+                                0 Units (Out of Stock)
+                            </span>
+                            <div class="stock-meter-bg"><div class="stock-meter-fill meter-out" style="width: 100%;"></div></div>
+                            {% elif item.quantity <= item.product.low_stock_threshold %}
+                            <span class="badge" style="background: #fffbeb; color: #b45309; font-weight: 700; font-size: 11.5px; border: 1px solid #fde68a;">
+                                ⚠️ {{ item.quantity }} Units (Low Stock)
+                            </span>
+                            <div class="stock-meter-bg"><div class="stock-meter-fill meter-low" style="width: 35%;"></div></div>
+                            {% else %}
+                            <span class="badge" style="background: #d1fae5; color: #047857; font-weight: 700; font-size: 11.5px; border: 1px solid #a7f3d0;">
+                                ✓ {{ item.quantity }} Units
+                            </span>
+                            <div class="stock-meter-bg"><div class="stock-meter-fill meter-ok" style="width: 100%;"></div></div>
+                            {% endif %}
+                            <span style="font-size: 10.5px; color: var(--muted); margin-top: 2px;">Min alert: {{ item.product.low_stock_threshold }}</span>
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <strong style="font-size: 13.5px; color: var(--text);">
+                            BDT {{ item.quantity|floatformat:0|add:0|default:0 }}
+                        </strong>
+                        <div style="font-size: 11px; color: var(--muted);">
+                            BDT {{ item.product.selling_price }} &times; {{ item.quantity }}
+                        </div>
+                    </td>
+                    <td style="text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap;">
+                        {{ item.updated_at|date:"M d, Y" }}<br>
+                        <span style="font-size: 11px;">{{ item.updated_at|date:"h:i A" }}</span>
+                    </td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        <div style="display: inline-flex; gap: 4px; justify-content: flex-end;">
+                            <a class="button primary" href="{% url 'inventory:add_stock' item.pk %}" style="padding: 4px 8px; font-size: 11.5px; height: auto;" title="Add Stock In">
+                                + Add
+                            </a>
+                            <a class="button" href="{% url 'inventory:remove_stock' item.pk %}" style="padding: 4px 8px; font-size: 11.5px; height: auto; color: #991b1b;" title="Deduct Stock Out">
+                                − Remove
+                            </a>
+                            <a class="button" href="{% url 'inventory:logs' %}?product={{ item.product.pk }}" style="padding: 4px 8px; font-size: 11.5px; height: auto;" title="View stock movement logs">
+                                📝 Logs
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6">No inventory yet. Add a product to create stock tracking.</td></tr>
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 36px; color: var(--muted);">
+                        No inventory records found matching your filters.
+                        {% if query or group_filter or status_filter != 'all' %}
+                        <div style="margin-top: 8px;"><a href="{% url 'inventory:list' %}" style="color: var(--primary); font-weight: 600;">Reset all filters &rarr;</a></div>
+                        {% endif %}
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>

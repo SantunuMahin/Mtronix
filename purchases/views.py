@@ -21,7 +21,8 @@ def purchase_create(request):
     form = PurchaseForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         try:
-            InventoryService.create_purchase(**form.cleaned_data)
+            user = request.user if request.user.is_authenticated else None
+            InventoryService.create_purchase(user=user, **form.cleaned_data)
             return redirect('purchases:list')
         except ValueError as exc:
             form.add_error('quantity', str(exc))

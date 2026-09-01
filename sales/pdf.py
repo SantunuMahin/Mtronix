@@ -18,14 +18,14 @@ except ImportError:
 BD_TZ = pytz.timezone('Asia/Dhaka')
 
 # ── Contact Details ──────────────────────────────────────────────────────────
-MTRONIX_ADDRESS = 'Ibrahim Electric & Electronics Market, 124 BCC Road, Dhaka, Bangladesh'
-MTRONIX_PHONE   = '01706-970195'
-MTRONIX_EMAIL   = 'mannanelectronics111@gmail.com'
+MTRONIX_ADDRESS = '44/45, KaftanBazar Madina Electric & Electronics, (2nd floor), shop no-3,4. Wari, Dhaka.'
+MTRONIX_PHONE   = '01744676770'
+MTRONIX_EMAIL   = 'mtronix1203@gmail.com'
 
 INTLISOFT_PHONE = '01888-735883'
 INTLISOFT_EMAIL = 'santunukaysarmahin@gmail.com'
 
-MAPS_URL = 'https://maps.google.com/?q=23.7218447,90.4121045'
+MAPS_URL = 'https://maps.app.goo.gl/2LzGoBcWLzdZQkrZ9'
 
 # ── Page & font constants ────────────────────────────────────────────────────
 PAGE_WIDTH    = 612   # US Letter
@@ -167,29 +167,27 @@ def _badge(
     x: float,
     y: float,
     text: str,
-    bg: tuple[float, float, float] = (0.82, 0.98, 0.90),
-    fg: tuple[float, float, float] = (0.02, 0.37, 0.27),
+    bg: tuple[float, float, float] = (1.0, 1.0, 1.0),
+    fg: tuple[float, float, float] = (0.0, 0.0, 0.0),
     w: float = 50,
     h: float = 14,
     size: int = 8,
 ) -> str:
-    """Render a colored status badge."""
+    """Render a clean monochrome status badge."""
     ops = [
-        _rect_fill(x, y, w, h, bg[0], bg[1], bg[2]),
-        _rect_stroke(x, y, w, h, bg[0]*0.9, bg[1]*0.9, bg[2]*0.9, 0.5),
-        _text_line(y + 3.5, text, size=size, x=x + 4, bold=True, r=fg[0], g=fg[1], b=fg[2]),
+        _rect_stroke(x, y, w, h, 0.0, 0.0, 0.0, 0.75),
+        _text_line(y + 3.5, text, size=size, x=x + 4, bold=True, r=0.0, g=0.0, b=0.0),
     ]
     return '\n'.join(ops)
 
 
 def _render_kpi_cards(
     y: float,
-    cards: Sequence[tuple[str, str, tuple[float, float, float]]],
-    h: float = 44,
+    cards: Sequence[tuple[str, str, Any]],
+    h: float = 38,
 ) -> list[str]:
     """
-    Render 3 or 4 sleek KPI metric cards side-by-side.
-    cards: list of (label, value, accent_rgb)
+    Render clean, open, black-and-white summary metrics without colored boxes or frames.
     """
     ops: list[str] = []
     n = len(cards)
@@ -197,19 +195,17 @@ def _render_kpi_cards(
         return ops
 
     total_w = 504.0
-    gap = 10.0
-    card_w = (total_w - (n - 1) * gap) / n
+    col_w = total_w / n
 
-    for i, (label, val, accent) in enumerate(cards):
-        cx = 54.0 + i * (card_w + gap)
-        # Background & border
-        ops.append(_rect_card(cx, y, card_w, h, bg=(0.985, 0.99, 1.0), border=(0.85, 0.88, 0.92)))
-        # Top color accent bar (2.5pt)
-        ops.append(_line(cx, y + h, cx + card_w, y + h, r=accent[0], g=accent[1], b=accent[2], width=2.5))
-        # Label (small muted uppercase)
-        ops.append(_text_line(y + h - 14, label.upper(), size=7.5, x=cx + 8, bold=True, r=0.39, g=0.45, b=0.55))
-        # Value (bold dark)
-        ops.append(_text_line(y + 8, val, size=11.5, x=cx + 8, bold=True, r=0.06, g=0.09, b=0.16))
+    # Clean top and bottom dividers
+    ops.append(_line(54.0, y + h, 558.0, y + h, r=0.0, g=0.0, b=0.0, width=1.0))
+    for i, item in enumerate(cards):
+        label = item[0]
+        val = item[1]
+        cx = 54.0 + i * col_w
+        ops.append(_text_line(y + h - 12, label.upper(), size=7.5, x=cx, bold=True, r=0.25, g=0.25, b=0.25))
+        ops.append(_text_line(y + 4, val, size=11, x=cx, bold=True, r=0.0, g=0.0, b=0.0))
+    ops.append(_line(54.0, y, 558.0, y, r=0.0, g=0.0, b=0.0, width=1.0))
 
     return ops
 
@@ -248,155 +244,112 @@ class PdfBuilder:
 
         page_obj_nums = [PAGE_START + i for i in range(n)]
         cont_obj_nums = [CONT_START + i for i in range(n)]
-        total_objs = 4 + 2 * n
 
-        content_streams: List[bytes] = []
-        for streams in self._pages:
-            raw = '\n'.join(s for s in streams if s).encode('latin-1', errors='replace')
-            content_streams.append(raw)
+        objects: Dict[int, bytes] = {}
 
         if self.auto_print:
-            catalog_bytes = (
-                f'{CATALOG} 0 obj\n'
-                f'<< /Type /Catalog /Pages {PAGES} 0 R /OpenAction << /Type /Action /S /Named /N /Print >> >>\n'
-                f'endobj\n'
-            ).encode('ascii')
+            objects[CATALOG] = (
+                b'<< /Type /Catalog /Pages 2 0 R /OpenAction << /S /JavaScript /JS (this.print({bUI:true,bSilent:false,bShrinkToFit:true});) >> >>'
+            )
         else:
-            catalog_bytes = (
-                f'{CATALOG} 0 obj\n'
-                f'<< /Type /Catalog /Pages {PAGES} 0 R >>\n'
-                f'endobj\n'
-            ).encode('ascii')
+            objects[CATALOG] = b'<< /Type /Catalog /Pages 2 0 R >>'
 
         kids = ' '.join(f'{num} 0 R' for num in page_obj_nums)
-        pages_bytes = (
-            f'{PAGES} 0 obj\n'
-            f'<< /Type /Pages /Kids [{kids}] /Count {n} >>\n'
-            f'endobj\n'
-        ).encode('ascii')
+        objects[PAGES] = f'<< /Type /Pages /Kids [{kids}] /Count {n} >>'.encode('ascii')
 
-        font_f1_bytes = (
-            f'{FONT_F1} 0 obj\n'
-            f'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\n'
-            f'endobj\n'
-        ).encode('ascii')
+        objects[FONT_F1] = b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'
+        objects[FONT_F2] = b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'
 
-        font_f2_bytes = (
-            f'{FONT_F2} 0 obj\n'
-            f'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\n'
-            f'endobj\n'
-        ).encode('ascii')
-
-        fixed_objects = [catalog_bytes, pages_bytes, font_f1_bytes, font_f2_bytes]
-
-        page_objects: List[bytes] = []
-        for i, (page_num, cont_num) in enumerate(zip(page_obj_nums, cont_obj_nums)):
-            page_bytes = (
-                f'{page_num} 0 obj\n'
-                f'<< /Type /Page /Parent {PAGES} 0 R\n'
-                f'   /MediaBox [0 0 {PAGE_WIDTH} {PAGE_HEIGHT}]\n'
-                f'   /Contents {cont_num} 0 R\n'
-                f'   /Resources << /Font << /F1 {FONT_F1} 0 R /F2 {FONT_F2} 0 R >> >>\n'
-                f'>>\n'
-                f'endobj\n'
+        for i, page_obj in enumerate(page_obj_nums):
+            cont_obj = cont_obj_nums[i]
+            objects[page_obj] = (
+                f'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+                f'/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> '
+                f'/Contents {cont_obj} 0 R >>'
             ).encode('ascii')
-            page_objects.append(page_bytes)
 
-        stream_objects: List[bytes] = []
-        for cont_num, raw_stream in zip(cont_obj_nums, content_streams):
-            stream_head = (
-                f'{cont_num} 0 obj\n'
-                f'<< /Length {len(raw_stream)} >>\n'
-                f'stream\n'
-            ).encode('ascii')
-            stream_foot = b'\nendstream\nendobj\n'
-            stream_objects.append(stream_head + raw_stream + stream_foot)
+        for i, cont_obj in enumerate(cont_obj_nums):
+            stream_body = '\n'.join(self._pages[i]).encode('latin-1')
+            objects[cont_obj] = (
+                f'<< /Length {len(stream_body)} >>\nstream\n'.encode('ascii')
+                + stream_body
+                + b'\nendstream'
+            )
 
-        all_objects = fixed_objects + page_objects + stream_objects
+        total_objects = CONT_START + n - 1
+        buf = bytearray()
+        buf.extend(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
 
-        out = io.BytesIO()
-        out.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
-        offsets: List[int] = []
+        offsets: Dict[int, int] = {}
+        for obj_num in range(1, total_objects + 1):
+            offsets[obj_num] = len(buf)
+            buf.extend(f'{obj_num} 0 obj\n'.encode('ascii'))
+            buf.extend(objects[obj_num])
+            buf.extend(b'\nendobj\n')
 
-        for obj_b in all_objects:
-            offsets.append(out.tell())
-            out.write(obj_b)
+        xref_start = len(buf)
+        buf.extend(f'xref\n0 {total_objects + 1}\n'.encode('ascii'))
+        buf.extend(b'0000000000 65535 f \n')
+        for obj_num in range(1, total_objects + 1):
+            buf.extend(f'{offsets[obj_num]:010d} 00000 n \n'.encode('ascii'))
 
-        xref_offset = out.tell()
-        out.write(f'xref\n0 {total_objs + 1}\n'.encode('ascii'))
-        out.write(b'0000000000 65535 f \n')
-        for off in offsets:
-            out.write(f'{off:010d} 00000 n \n'.encode('ascii'))
-
-        trailer = (
-            f'trailer\n'
-            f'<< /Size {total_objs + 1} /Root {CATALOG} 0 R >>\n'
-            f'startxref\n'
-            f'{xref_offset}\n'
-            f'%%EOF\n'
+        buf.extend(
+            f'trailer\n<< /Size {total_objects + 1} /Root 1 0 R >>\n'
+            f'startxref\n{xref_start}\n%%EOF\n'.encode('ascii')
         )
-        out.write(trailer.encode('ascii'))
-        return out.getvalue()
+        return bytes(buf)
 
 
-# ── Page Composer ────────────────────────────────────────────────────────────
+# ── Page Composer ─────────────────────────────────────────────────────────────
 class PageComposer:
-    Y_TOP = 760
-    Y_BOTTOM = 80
-
-    def __init__(self, builder: PdfBuilder, header_fn=None, footer_fn=None) -> None:
-        self._builder = builder
-        self._header_fn = header_fn
-        self._footer_fn = footer_fn
-        self._page_no = 0
+    def __init__(
+        self,
+        builder: PdfBuilder,
+        header_fn: Callable[[int], List[str]],
+        footer_fn: Callable[[int, bool], List[str]],
+        page_top: float = 620.0,
+        page_bottom: float = 70.0,
+    ) -> None:
+        self.builder = builder
+        self.header_fn = header_fn
+        self.footer_fn = footer_fn
+        self.page_top = page_top
+        self.page_bottom = page_bottom
+        self.page_no = 0
+        self._y = page_top
         self._streams: List[str] = []
-        self._y = self.Y_TOP
-        self._new_page()
+        self._start_page()
 
-    def _new_page(self) -> None:
-        if self._page_no > 0:
-            self._close_page(is_last=False)
-        self._page_no += 1
+    def _start_page(self) -> None:
+        self.page_no += 1
         self._streams = []
-        self._y = self.Y_TOP
+        self._streams.extend(self.header_fn(self.page_no))
+        self._y = self.page_top
 
-        if self._header_fn:
-            header_ops = self._header_fn(self._page_no)
-            self._streams.extend(header_ops)
-            lowest_y = self.Y_TOP
-            for op in header_ops:
-                if ' Td ' in op:
-                    try:
-                        parts = op.split('Td')[0].split()
-                        if len(parts) >= 2:
-                            y_val = float(parts[-1])
-                            lowest_y = min(lowest_y, y_val)
-                    except (ValueError, IndexError):
-                        pass
-            self._y = lowest_y - 16
+    def _close_page(self, is_last: bool = False) -> None:
+        self._streams.extend(self.footer_fn(self.page_no, is_last))
+        self.builder.add_page(self._streams)
 
-    def _close_page(self, is_last: bool) -> None:
-        if self._footer_fn:
-            for op in self._footer_fn(self._page_no, is_last):
-                self._streams.append(op)
-        self._builder.add_page(self._streams)
+    def ensure(self, pts: float) -> None:
+        if (self._y - pts) < self.page_bottom:
+            self._close_page(is_last=False)
+            self._start_page()
 
-    def ensure(self, needed: float) -> None:
-        if self._y - needed < self.Y_BOTTOM:
-            self._new_page()
+    def add_line(
+        self,
+        text: str,
+        size: int = 9,
+        bold: bool = False,
+        r: float = 0.0,
+        g: float = 0.0,
+        b: float = 0.0,
+        x: float = 54.0,
+    ) -> None:
+        self.ensure(size + 6)
+        self._streams.append(_text_line(self._y, text, size=size, bold=bold, r=r, g=g, b=b, x=x))
+        self._y -= (size + 4)
 
-    def add(self, op: str, dy: float = 0) -> None:
-        if op:
-            self._streams.append(op)
-        if dy:
-            self._y -= dy
-
-    def add_line(self, text: str, size: int = 10, x: float = 54, bold: bool = False, dy: float | None = None, r: float = 0.06, g: float = 0.09, b: float = 0.16) -> None:
-        self.ensure(size + 4)
-        self._streams.append(_text_line(self._y, text, size, x, bold, r, g, b))
-        self._y -= dy if dy is not None else size + 4
-
-    def add_divider(self, size: int = 10) -> None:
+    def add_divider(self) -> None:
         self.ensure(10)
         self._streams.append(_divider(self._y))
         self._y -= 10
@@ -418,19 +371,19 @@ def _make_footer_ops(
     is_last: bool,
     *args,
 ) -> List[str]:
-    """Render a clean executive footer across all pages."""
+    """Render a clean black and white executive footer across all pages."""
     ops: List[str] = [
-        _line(54, 52, 558, 52, r=0.88, g=0.91, b=0.94, width=0.75),
-        _text_line(38, f'Mtronix: {MTRONIX_ADDRESS}', 7.5, 54, r=0.39, g=0.45, b=0.55),
-        _text_line(26, f'Ph: {MTRONIX_PHONE}  |  Email: {MTRONIX_EMAIL}', 7.5, 54, r=0.39, g=0.45, b=0.55),
-        _text_line(38, f'Page {page_no}', 8, 510, bold=True, r=0.06, g=0.09, b=0.16),
-        _text_line(26, f'Software: Intlisoft Innovation ({INTLISOFT_PHONE})', 7.5, 330, r=0.47, g=0.53, b=0.62),
+        _line(54, 52, 558, 52, r=0.0, g=0.0, b=0.0, width=0.75),
+        _text_line(38, f'Mtronix: {MTRONIX_ADDRESS}', 7.5, 54, r=0.25, g=0.25, b=0.25),
+        _text_line(26, f'Ph: {MTRONIX_PHONE}  |  Email: {MTRONIX_EMAIL}', 7.5, 54, r=0.25, g=0.25, b=0.25),
+        _text_line(38, f'Page {page_no}', 8, 510, bold=True, r=0.0, g=0.0, b=0.0),
+        _text_line(26, f'Software: Intlisoft Innovation ({INTLISOFT_PHONE})', 7.5, 330, r=0.3, g=0.3, b=0.3),
     ]
     return ops
 
 
 # ── 1. Sale Receipt PDF ──────────────────────────────────────────────────────
-def build_sale_receipt_pdf(sale) -> bytes:
+def build_sale_receipt_pdf(sale, prev_history=None) -> bytes:
     """Generate a high-end multi-page PDF receipt for the given Sale instance."""
     sold_at = _bd_time(sale.sold_at)
     customer = sale.customer_name or 'Walk-in Customer'
@@ -449,10 +402,10 @@ def build_sale_receipt_pdf(sale) -> bytes:
         ops = []
         if page_no == 1:
             # ── Brand Header ──
-            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.06, g=0.09, b=0.16))
-            ops.append(_text_line(748, 'ELECTRONICS, HARDWARE & COMPONENTS', 8, 54, bold=True, r=0.06, g=0.46, b=0.43))
-            ops.append(_text_line(735, '124 BCC Road, Ibrahim Market, Dhaka, Bangladesh', 8, 54, r=0.39, g=0.45, b=0.55))
-            ops.append(_text_line(723, f'Phone: {MTRONIX_PHONE}  |  {MTRONIX_EMAIL}', 8, 54, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(748, 'ELECTRONICS, HARDWARE & COMPONENTS', 8, 54, bold=True, r=0.2, g=0.2, b=0.2))
+            ops.append(_text_line(735, MTRONIX_ADDRESS, 8, 54, r=0.25, g=0.25, b=0.25))
+            ops.append(_text_line(723, f'Phone: {MTRONIX_PHONE}  |  {MTRONIX_EMAIL}', 8, 54, r=0.25, g=0.25, b=0.25))
 
             # ── QR Code Top Right ──
             if qr_matrix:
@@ -463,56 +416,61 @@ def build_sale_receipt_pdf(sale) -> bytes:
                 card_y = 712
                 qr_x = card_x + 7
                 qr_y = card_y + 4
-                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(0.98, 0.99, 1.0), border=(0.85, 0.88, 0.92)))
-                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.39, g=0.45, b=0.55))
+                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(1.0, 1.0, 1.0), border=(0.0, 0.0, 0.0)))
+                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.0, g=0.0, b=0.0))
                 ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y, qr_cell))
 
             # Divider below brand
-            ops.append(_line(54, 710, 558, 710, r=0.06, g=0.09, b=0.16, width=1.5))
+            ops.append(_line(54, 710, 558, 710, r=0.0, g=0.0, b=0.0, width=1.5))
 
-            # ── Meta Box ──
-            ops.append(_rect_card(54, 642, 504, 60, bg=(0.975, 0.985, 0.995), border=(0.88, 0.91, 0.94)))
-            
+            # ── Meta Details (Clean Open Layout) ──
             # Left col: Invoice & Date
-            ops.append(_text_line(685, 'INVOICE NO', 7.5, 68, bold=True, r=0.39, g=0.45, b=0.55))
-            ops.append(_text_line(671, f'SALE-{sale.pk:05d}', 11, 68, bold=True, r=0.06, g=0.46, b=0.43))
-            ops.append(_text_line(655, f'Date: {sold_at}', 8.5, 68, r=0.28, g=0.33, b=0.41))
+            ops.append(_text_line(695, 'INVOICE NO', 7.5, 54, bold=True, r=0.3, g=0.3, b=0.3))
+            ops.append(_text_line(681, f'SALE-{sale.pk:05d}', 11, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(667, f'Date: {sold_at}', 8.5, 54, r=0.2, g=0.2, b=0.2))
 
             # Right col: Customer & Status
-            ops.append(_text_line(685, 'CUSTOMER DETAILS', 7.5, 290, bold=True, r=0.39, g=0.45, b=0.55))
-            ops.append(_text_line(671, customer, 10.5, 290, bold=True, r=0.06, g=0.09, b=0.16))
+            cust_label = 'CUSTOMER DETAILS'
+            if prev_history and prev_history.get('has_previous_orders'):
+                cust_label += f" (Order #{prev_history['previous_orders_count'] + 1})"
+            ops.append(_text_line(695, cust_label, 7.5, 290, bold=True, r=0.3, g=0.3, b=0.3))
+            ops.append(_text_line(681, customer, 10.5, 290, bold=True, r=0.0, g=0.0, b=0.0))
             cust_sub = f'Phone: {phone}' if phone else ''
             if address:
                 cust_sub += f'  |  {address}' if cust_sub else address
             if cust_sub:
-                ops.append(_text_line(656, cust_sub[:42], 8, 290, r=0.39, g=0.45, b=0.55))
+                ops.append(_text_line(667, cust_sub[:42], 8, 290, r=0.25, g=0.25, b=0.25))
 
-            # Payment badge
+            # Payment badge (Monochrome)
             if is_paid:
-                ops.append(_badge(476, 672, 'PAID', bg=(0.82, 0.98, 0.90), fg=(0.02, 0.37, 0.27), w=66, h=16, size=8.5))
+                ops.append(_badge(476, 680, 'PAID', bg=(1.0, 1.0, 1.0), fg=(0.0, 0.0, 0.0), w=66, h=16, size=8.5))
             elif is_partial:
-                ops.append(_badge(476, 672, 'PARTIAL', bg=(0.99, 0.95, 0.78), fg=(0.57, 0.25, 0.05), w=66, h=16, size=8.5))
+                ops.append(_badge(476, 680, 'PARTIAL', bg=(1.0, 1.0, 1.0), fg=(0.0, 0.0, 0.0), w=66, h=16, size=8.5))
             else:
-                ops.append(_badge(476, 672, 'UNPAID', bg=(0.99, 0.89, 0.89), fg=(0.60, 0.11, 0.11), w=66, h=16, size=8.5))
+                ops.append(_badge(476, 680, 'UNPAID', bg=(1.0, 1.0, 1.0), fg=(0.0, 0.0, 0.0), w=66, h=16, size=8.5))
 
-            curr_y = 626
+            ops.append(_line(54, 656, 558, 656, r=0.0, g=0.0, b=0.0, width=0.75))
+
+            curr_y = 636
             # ── Table Header Bar ──
-            ops.append(_rect_fill(54, curr_y - 4, 504, 20, r=0.06, g=0.09, b=0.16))
-            ops.append(_text_line(curr_y + 2, 'ITEM DESCRIPTION', 8.5, 66, bold=True, r=1.0, g=1.0, b=1.0))
-            ops.append(_text_line(curr_y + 2, 'SKU', 8.5, 260, bold=True, r=1.0, g=1.0, b=1.0))
-            ops.append(_text_right(curr_y + 2, 'QTY', 8.5, 370, bold=True, r=1.0, g=1.0, b=1.0))
-            ops.append(_text_right(curr_y + 2, 'UNIT PRICE (BDT)', 8.5, 460, bold=True, r=1.0, g=1.0, b=1.0))
-            ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 8.5, 550, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_line(54, curr_y + 12, 558, curr_y + 12, r=0.0, g=0.0, b=0.0, width=1.5))
+            ops.append(_text_line(curr_y + 2, 'ITEM DESCRIPTION', 8.5, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(curr_y + 2, 'SKU', 8.5, 260, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y + 2, 'QTY', 8.5, 370, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y + 2, 'UNIT PRICE (BDT)', 8.5, 460, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 8.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, curr_y - 4, 558, curr_y - 4, r=0.0, g=0.0, b=0.0, width=1.5))
         else:
-            ops.append(_text_line(760, f'Mtronix Sales Receipt - SALE-{sale.pk:05d} (Page {page_no})', 9, 54, bold=True, r=0.39, g=0.45, b=0.55))
-            ops.append(_line(54, 750, 558, 750, r=0.88, g=0.91, b=0.94, width=0.75))
+            ops.append(_text_line(760, f'Mtronix Sales Receipt - SALE-{sale.pk:05d} (Page {page_no})', 9, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, 750, 558, 750, r=0.0, g=0.0, b=0.0, width=0.75))
             curr_y = 732
-            ops.append(_rect_fill(54, curr_y - 4, 504, 18, r=0.06, g=0.09, b=0.16))
-            ops.append(_text_line(curr_y + 1, 'ITEM DESCRIPTION', 8, 66, bold=True, r=1.0, g=1.0, b=1.0))
-            ops.append(_text_line(curr_y + 1, 'SKU', 8, 260, bold=True, r=1.0, g=1.0, b=1.0))
-            ops.append(_text_right(curr_y + 1, 'QTY', 8, 370, bold=True, r=1.0, g=1.0, b=1.0))
-            ops.append(_text_right(curr_y + 1, 'UNIT PRICE (BDT)', 8, 460, bold=True, r=1.0, g=1.0, b=1.0))
-            ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 8, 550, bold=True, r=1.0, g=1.0, b=1.0))
+            ops.append(_line(54, curr_y + 10, 558, curr_y + 10, r=0.0, g=0.0, b=0.0, width=1.5))
+            ops.append(_text_line(curr_y + 1, 'ITEM DESCRIPTION', 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(curr_y + 1, 'SKU', 8, 260, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y + 1, 'QTY', 8, 370, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y + 1, 'UNIT PRICE (BDT)', 8, 460, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 8, 558, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, curr_y - 4, 558, curr_y - 4, r=0.0, g=0.0, b=0.0, width=1.5))
 
         return ops
 
@@ -522,66 +480,98 @@ def build_sale_receipt_pdf(sale) -> bytes:
     builder = PdfBuilder(auto_print=True)
     pc = PageComposer(builder, header_fn=header, footer_fn=footer)
 
-    # ── Item Rows with Zebra Striping ──
+    # ── Item Rows ──
     for idx, item in enumerate(sale.items.select_related('product').all()):
         pc.ensure(20)
         y = pc.y
-        # Zebra shading on odd rows
-        if idx % 2 == 1:
-            pc._streams.append(_rect_fill(54, y - 4, 504, 18, 0.975, 0.985, 0.995))
-        pc._streams.append(_line(54, y - 4, 558, y - 4, 0.90, 0.92, 0.95, 0.5))
+        pc._streams.append(_line(54, y - 4, 558, y - 4, 0.80, 0.80, 0.80, 0.5))
 
-        p_name = _sanitize_text(item.display_name)[:30]
+        p_name = _sanitize_text(item.display_name)[:32]
         sku_val = _sanitize_text(item.sku) if item.sku else '-'
 
-        pc._streams.append(_text_line(y, p_name, 9, 66, bold=True, r=0.06, g=0.09, b=0.16))
-        pc._streams.append(_text_line(y, sku_val, 8.5, 260, r=0.39, g=0.45, b=0.55))
-        pc._streams.append(_text_right(y, str(item.quantity), 9, 370, r=0.06, g=0.09, b=0.16))
-        pc._streams.append(_text_right(y, f'{item.unit_price:.2f}', 9, 460, r=0.06, g=0.09, b=0.16))
-        pc._streams.append(_text_right(y, f'{item.total_amount:.2f}', 9.5, 550, bold=True, r=0.06, g=0.09, b=0.16))
+        pc._streams.append(_text_line(y, p_name, 9, 54, bold=True, r=0.0, g=0.0, b=0.0))
+        pc._streams.append(_text_line(y, sku_val, 8.5, 260, r=0.25, g=0.25, b=0.25))
+        pc._streams.append(_text_right(y, str(item.quantity), 9, 370, r=0.0, g=0.0, b=0.0))
+        pc._streams.append(_text_right(y, f'{item.unit_price:.2f}', 9, 460, r=0.0, g=0.0, b=0.0))
+        pc._streams.append(_text_right(y, f'{item.total_amount:.2f}', 9.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
         pc.skip(18)
 
-    # ── Financial Totals Box ──
-    pc.ensure(110)
-    pc.skip(8)
+    # ── Financial Totals (Clean Open Monochrome List) ──
+    has_prev = bool(prev_history and prev_history.get('has_previous_orders'))
+    need_h = 130 if has_prev else 90
+    pc.ensure(need_h)
+    pc.skip(10)
     y = pc.y
-    box_w = 230.0
+    box_w = 220.0
     box_x = 558.0 - box_w
     has_due = (due_amt > 0)
-    box_h = 88.0 if has_due else 64.0
 
-    pc._streams.append(_rect_card(box_x, y - box_h, box_w, box_h, bg=(0.98, 0.985, 0.995), border=(0.85, 0.88, 0.92)))
+    # Top border for totals section
+    pc._streams.append(_line(54, y + 6, 558, y + 6, 0.0, 0.0, 0.0, 1.5))
     
     # Total Amount
-    pc._streams.append(_text_line(y - 18, 'TOTAL AMOUNT:', 9.5, box_x + 14, bold=True, r=0.06, g=0.09, b=0.16))
-    pc._streams.append(_text_line(y - 18, f'BDT {sale.total_amount:.2f}', 12, box_x + 120, bold=True, r=0.06, g=0.46, b=0.43))
+    pc._streams.append(_text_line(y - 12, 'TOTAL AMOUNT:', 9.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y - 12, f'BDT {sale.total_amount:.2f}', 11, 558, bold=True, r=0.0, g=0.0, b=0.0))
     
     # Paid Amount
-    pc._streams.append(_text_line(y - 34, 'PAID AMOUNT:', 9, box_x + 14, bold=True, r=0.02, g=0.37, b=0.27))
-    pc._streams.append(_text_line(y - 34, f'BDT {paid_amt:.2f}', 10.5, box_x + 120, bold=True, r=0.02, g=0.37, b=0.27))
+    pc._streams.append(_text_line(y - 28, 'PAID AMOUNT:', 9, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y - 28, f'BDT {paid_amt:.2f}', 10, 558, bold=True, r=0.0, g=0.0, b=0.0))
 
-    # Payment Status
-    pc._streams.append(_text_line(y - 50, 'Payment Status:', 8.5, box_x + 14, r=0.39, g=0.45, b=0.55))
-    pc._streams.append(_text_line(y - 50, status_str, 9, box_x + 120, bold=True, r=(0.02 if is_paid else (0.57 if is_partial else 0.60)), g=(0.37 if is_paid else (0.25 if is_partial else 0.11)), b=(0.27 if is_paid else (0.05 if is_partial else 0.11))))
-
+    curr_tot_y = y - 36
+    # Balance Due on current invoice
     if has_due:
-        pc._streams.append(_line(box_x + 10, y - 60, box_x + box_w - 10, y - 60, 0.88, 0.91, 0.94, 0.5))
-        pc._streams.append(_text_line(y - 76, 'BALANCE DUE:', 9.5, box_x + 14, bold=True, r=0.60, g=0.11, b=0.11))
-        pc._streams.append(_text_line(y - 76, f'BDT {due_amt:.2f}', 12, box_x + 120, bold=True, r=0.60, g=0.11, b=0.11))
+        pc._streams.append(_line(box_x, curr_tot_y, 558, curr_tot_y, 0.0, 0.0, 0.0, 1.0))
+        curr_tot_y -= 14
+        pc._streams.append(_text_line(curr_tot_y, 'BALANCE DUE:', 9.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+        pc._streams.append(_text_right(curr_tot_y, f'BDT {due_amt:.2f}', 11, 558, bold=True, r=0.0, g=0.0, b=0.0))
 
-    # Notes on left side of totals
-    pc._streams.append(_text_line(y - 18, 'Thank you for your purchase!', 10.5, 54, bold=True, r=0.06, g=0.09, b=0.16))
-    pc._streams.append(_text_line(y - 32, 'Warranty claims valid with this invoice.', 8, 54, r=0.39, g=0.45, b=0.55))
-    pc._streams.append(_text_line(y - 44, 'Computer-generated receipt, valid without signature.', 8, 54, r=0.39, g=0.45, b=0.55))
+    # Previous Orders Summary (if returning customer)
+    if has_prev:
+        curr_tot_y -= 8
+        pc._streams.append(_line(box_x, curr_tot_y, 558, curr_tot_y, 0.0, 0.0, 0.0, 0.5))
+        curr_tot_y -= 12
+        prev_cnt = prev_history['previous_orders_count']
+        prev_billed = float(prev_history['previous_total_billed'])
+        prev_due = float(prev_history['previous_total_due'])
+        net_due = float(prev_history['net_due'])
 
-    pc.skip(box_h + 16)
+        pc._streams.append(_text_line(curr_tot_y, f'Prev Purchases ({prev_cnt} orders):', 8, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+        pc._streams.append(_text_right(curr_tot_y, f'BDT {prev_billed:.2f}', 8.5, 558, r=0.0, g=0.0, b=0.0))
+
+        if prev_due > 0:
+            curr_tot_y -= 12
+            pc._streams.append(_text_line(curr_tot_y, 'Previous Unpaid Due:', 8, box_x, r=0.0, g=0.0, b=0.0))
+            pc._streams.append(_text_right(curr_tot_y, f'BDT {prev_due:.2f}', 8.5, 558, r=0.0, g=0.0, b=0.0))
+            
+            curr_tot_y -= 12
+            pc._streams.append(_text_line(curr_tot_y, 'NET TOTAL DUE:', 9, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+            pc._streams.append(_text_right(curr_tot_y, f'BDT {net_due:.2f}', 10, 558, bold=True, r=0.0, g=0.0, b=0.0))
+
+    curr_tot_y -= 8
+    pc._streams.append(_line(54, curr_tot_y, 558, curr_tot_y, 0.0, 0.0, 0.0, 1.5))
+
+    # Friendly Note & Signatures on left
+    pc._streams.append(_text_line(y - 12, 'Thank you for your purchase!', 10, 54, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_line(y - 26, 'Please keep this invoice for warranty and support.', 8, 54, r=0.25, g=0.25, b=0.25))
+    if has_prev and prev_history.get('last_previous_order_date'):
+        pc._streams.append(_text_line(y - 38, f"Last previous order on {prev_history['last_previous_order_date']}", 7.5, 54, r=0.2, g=0.2, b=0.2))
+
+    # Customer & Seller Signatures
+    sign_y = curr_tot_y - 24
+    pc._streams.append(_line(54, sign_y, 170, sign_y, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(sign_y - 10, "Customer's Signature", 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
+
+    pc._streams.append(_line(200, sign_y, 316, sign_y, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(sign_y - 10, "Seller's Signature", 8, 200, bold=True, r=0.0, g=0.0, b=0.0))
+
+    pc.skip(abs(y - sign_y) + 20)
     pc.finish()
     return builder.build()
 
 
 # ── 2. Customer Account Statement PDF ─────────────────────────────────────────
 def build_customer_statement_pdf(data: dict[str, Any]) -> bytes:
-    """Generate executive consolidated customer account statement PDF."""
+    """Generate executive consolidated customer account statement PDF in pure black & white."""
     customer_name = data.get('customer_name') or 'Valued Customer'
     customer_phone = data.get('customer_phone') or ''
     customer_address = data.get('customer_address') or ''
@@ -602,11 +592,11 @@ def build_customer_statement_pdf(data: dict[str, Any]) -> bytes:
         ops = []
         if page_no == 1:
             # ── Brand Header ──
-            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.06, g=0.09, b=0.16))
+            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.0, g=0.0, b=0.0))
             sub_title = 'CONSOLIDATED SALES & CUSTOMER LEDGER' if is_multi_customer else 'CUSTOMER ACCOUNT STATEMENT & LEDGER'
-            ops.append(_text_line(748, sub_title, 8.5, 54, bold=True, r=0.06, g=0.46, b=0.43))
-            ops.append(_text_line(735, '124 BCC Road, Ibrahim Market, Dhaka, Bangladesh', 8, 54, r=0.39, g=0.45, b=0.55))
-            ops.append(_text_line(723, f'Phone: {MTRONIX_PHONE}  |  {MTRONIX_EMAIL}', 8, 54, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(748, sub_title, 8.5, 54, bold=True, r=0.2, g=0.2, b=0.2))
+            ops.append(_text_line(735, '124 BCC Road, Ibrahim Market, Dhaka, Bangladesh', 8, 54, r=0.25, g=0.25, b=0.25))
+            ops.append(_text_line(723, f'Phone: {MTRONIX_PHONE}  |  {MTRONIX_EMAIL}', 8, 54, r=0.25, g=0.25, b=0.25))
 
             if qr_matrix:
                 qr_size = len(qr_matrix) * qr_cell
@@ -616,101 +606,93 @@ def build_customer_statement_pdf(data: dict[str, Any]) -> bytes:
                 card_y = 712
                 qr_x = card_x + 7
                 qr_y = card_y + 4
-                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(0.98, 0.99, 1.0), border=(0.85, 0.88, 0.92)))
-                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.39, g=0.45, b=0.55))
+                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(1.0, 1.0, 1.0), border=(0.0, 0.0, 0.0)))
+                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.0, g=0.0, b=0.0))
                 ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y, qr_cell))
 
-            ops.append(_line(54, 710, 558, 710, r=0.06, g=0.09, b=0.16, width=1.5))
+            ops.append(_line(54, 710, 558, 710, r=0.0, g=0.0, b=0.0, width=1.5))
 
-            # ── Customer / Account Info Box ──
-            ops.append(_rect_card(54, 652, 504, 50, bg=(0.975, 0.985, 0.995), border=(0.88, 0.91, 0.94)))
+            # ── Customer / Account Info (Clean Open Layout, No Box) ──
             if is_multi_customer:
-                ops.append(_text_line(688, 'STATEMENT TYPE:', 7.5, 68, bold=True, r=0.39, g=0.45, b=0.55))
-                ops.append(_text_line(674, f'Consolidated Ledger ({distinct_count} Accounts)', 10.5, 68, bold=True, r=0.06, g=0.09, b=0.16))
-                ops.append(_text_line(660, 'Combined transaction ledger across multiple customer accounts & walk-ins', 7.5, 68, r=0.39, g=0.45, b=0.55))
+                ops.append(_text_line(695, 'STATEMENT TYPE', 7.5, 54, bold=True, r=0.3, g=0.3, b=0.3))
+                ops.append(_text_line(681, f'Consolidated Ledger ({distinct_count} Accounts)', 10.5, 54, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(667, 'Combined transaction ledger across customer accounts', 7.5, 54, r=0.25, g=0.25, b=0.25))
             else:
-                ops.append(_text_line(688, 'ACCOUNT FOR:', 7.5, 68, bold=True, r=0.39, g=0.45, b=0.55))
-                ops.append(_text_line(674, customer_name, 11, 68, bold=True, r=0.06, g=0.09, b=0.16))
+                ops.append(_text_line(695, 'ACCOUNT FOR', 7.5, 54, bold=True, r=0.3, g=0.3, b=0.3))
+                ops.append(_text_line(681, customer_name, 11, 54, bold=True, r=0.0, g=0.0, b=0.0))
                 c_meta = f'Phone: {customer_phone}' if customer_phone else ''
                 if customer_address:
                     c_meta += f'  |  {customer_address}' if c_meta else customer_address
                 if c_meta:
-                    ops.append(_text_line(660, c_meta[:50], 8, 68, r=0.39, g=0.45, b=0.55))
+                    ops.append(_text_line(667, c_meta[:50], 8, 54, r=0.25, g=0.25, b=0.25))
 
-            ops.append(_text_line(688, 'STATEMENT CRITERIA:', 7.5, 340, bold=True, r=0.39, g=0.45, b=0.55))
-            ops.append(_text_line(674, f'{filter_label}', 9.5, 340, bold=True, r=0.06, g=0.46, b=0.43))
-            ops.append(_text_line(660, f'Generated: {generated}', 8, 340, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(695, 'STATEMENT CRITERIA', 7.5, 340, bold=True, r=0.3, g=0.3, b=0.3))
+            ops.append(_text_line(681, f'{filter_label}', 9.5, 340, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(667, f'Generated: {generated}', 8, 340, r=0.25, g=0.25, b=0.25))
+            ops.append(_line(54, 654, 558, 654, r=0.8, g=0.8, b=0.8, width=0.5))
 
-            # ── KPI Cards ──
-            kpis = [
-                ('Total Invoiced', f'BDT {total_billed:.2f}', (0.06, 0.46, 0.43)),
-                ('Total Paid', f'BDT {total_paid:.2f}', (0.02, 0.37, 0.27)),
-                ('Outstanding Due', f'BDT {total_due:.2f}', (0.60, 0.11, 0.11) if total_due > 0 else (0.06, 0.46, 0.43)),
-            ]
-            ops.extend(_render_kpi_cards(596, kpis, h=44))
-
-            curr_y = 580
-            # ── Table Header Bar ──
-            ops.append(_rect_fill(54, curr_y - 4, 504, 20, r=0.06, g=0.09, b=0.16))
+            curr_y = 636
+            # ── Table Header Bar (Clean White Background, Black Lines) ──
+            ops.append(_line(54, curr_y + 12, 558, curr_y + 12, r=0.0, g=0.0, b=0.0, width=1.5))
             if is_multi_customer:
-                ops.append(_text_line(curr_y + 2, 'DATE', 7.5, 60, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 2, 'INVOICE', 7.5, 118, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 2, 'CUSTOMER', 7.5, 175, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 2, 'PRODUCT', 7.5, 262, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 2, 'QTY', 7.5, 375, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 2, 'PRICE (BDT)', 7.5, 435, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 7.5, 495, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 2, 'STATUS', 7.5, 514, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'DATE', 7.5, 60, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 2, 'INVOICE', 7.5, 118, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 2, 'CUSTOMER', 7.5, 175, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 2, 'PRODUCT', 7.5, 262, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 2, 'QTY', 7.5, 375, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 2, 'PRICE (BDT)', 7.5, 435, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 7.5, 495, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 2, 'STATUS', 7.5, 514, bold=True, r=0.0, g=0.0, b=0.0))
             else:
-                ops.append(_text_line(curr_y + 2, 'DATE', 8, 64, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 2, 'INVOICE', 8, 135, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 2, 'PRODUCT DESCRIPTION', 8, 195, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 2, 'QTY', 8, 360, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 2, 'PRICE (BDT)', 8, 430, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 8, 495, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 2, 'STATUS', 8, 516, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 2, 'DATE', 8, 64, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 2, 'INVOICE', 8, 135, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 2, 'PRODUCT DESCRIPTION', 8, 195, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 2, 'QTY', 8, 360, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 2, 'PRICE (BDT)', 8, 430, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 2, 'TOTAL (BDT)', 8, 495, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 2, 'STATUS', 8, 516, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, curr_y - 4, 558, curr_y - 4, r=0.0, g=0.0, b=0.0, width=1.5))
         else:
             header_title = f'Mtronix Consolidated Statement (Page {page_no})' if is_multi_customer else f'Mtronix Customer Statement - {customer_name} (Page {page_no})'
-            ops.append(_text_line(760, header_title, 9, 54, bold=True, r=0.39, g=0.45, b=0.55))
-            ops.append(_line(54, 750, 558, 750, r=0.88, g=0.91, b=0.94, width=0.75))
+            ops.append(_text_line(760, header_title, 9, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, 750, 558, 750, r=0.0, g=0.0, b=0.0, width=0.75))
             curr_y = 732
-            ops.append(_rect_fill(54, curr_y - 4, 504, 18, r=0.06, g=0.09, b=0.16))
+            ops.append(_line(54, curr_y + 10, 558, curr_y + 10, r=0.0, g=0.0, b=0.0, width=1.5))
             if is_multi_customer:
-                ops.append(_text_line(curr_y + 1, 'DATE', 7.5, 60, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 1, 'INVOICE', 7.5, 118, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 1, 'CUSTOMER', 7.5, 175, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 1, 'PRODUCT', 7.5, 262, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 1, 'QTY', 7.5, 375, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 1, 'PRICE (BDT)', 7.5, 435, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 7.5, 495, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 1, 'STATUS', 7.5, 514, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'DATE', 7.5, 60, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 1, 'INVOICE', 7.5, 118, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 1, 'CUSTOMER', 7.5, 175, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 1, 'PRODUCT', 7.5, 262, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 1, 'QTY', 7.5, 375, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 1, 'PRICE (BDT)', 7.5, 435, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 7.5, 495, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 1, 'STATUS', 7.5, 514, bold=True, r=0.0, g=0.0, b=0.0))
             else:
-                ops.append(_text_line(curr_y + 1, 'DATE', 8, 64, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 1, 'INVOICE', 8, 135, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 1, 'PRODUCT DESCRIPTION', 8, 195, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 1, 'QTY', 8, 360, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 1, 'PRICE (BDT)', 8, 430, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 8, 495, bold=True, r=1.0, g=1.0, b=1.0))
-                ops.append(_text_line(curr_y + 1, 'STATUS', 8, 516, bold=True, r=1.0, g=1.0, b=1.0))
+                ops.append(_text_line(curr_y + 1, 'DATE', 8, 64, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 1, 'INVOICE', 8, 135, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 1, 'PRODUCT DESCRIPTION', 8, 195, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 1, 'QTY', 8, 360, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 1, 'PRICE (BDT)', 8, 430, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_right(curr_y + 1, 'TOTAL (BDT)', 8, 495, bold=True, r=0.0, g=0.0, b=0.0))
+                ops.append(_text_line(curr_y + 1, 'STATUS', 8, 516, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, curr_y - 4, 558, curr_y - 4, r=0.0, g=0.0, b=0.0, width=1.5))
 
         return ops
 
     def footer(page_no: int, is_last: bool) -> List[str]:
         return _make_footer_ops(page_no, is_last)
 
-    builder = PdfBuilder()
+    builder = PdfBuilder(auto_print=True)
     pc = PageComposer(builder, header_fn=header, footer_fn=footer)
 
     if not items:
         pc.ensure(40)
-        pc.add_line('No transaction records found for the selected criteria.', 10, r=0.39, g=0.45, b=0.55)
+        pc.add_line('No records matching criteria.', 10, r=0.25, g=0.25, b=0.25)
     else:
         for idx, it in enumerate(items):
             pc.ensure(18)
             y = pc.y
-            if idx % 2 == 1:
-                pc._streams.append(_rect_fill(54, y - 4, 504, 18, 0.975, 0.985, 0.995))
-            pc._streams.append(_line(54, y - 4, 558, y - 4, 0.90, 0.92, 0.95, 0.5))
+            pc._streams.append(_line(54, y - 4, 558, y - 4, 0.80, 0.80, 0.80, 0.5))
 
             date_str = _sanitize_text(it.get('date', '-'))
             inv_str = _sanitize_text(it.get('sale_code', f"#{it.get('sale_id', '')}"))
@@ -722,59 +704,67 @@ def build_customer_statement_pdf(data: dict[str, Any]) -> bytes:
             st_raw = str(it.get('status', 'PAID')).upper()
 
             if is_multi_customer:
-                pc._streams.append(_text_line(y, date_str, 7.5, 60, r=0.28, g=0.33, b=0.41))
-                pc._streams.append(_text_line(y, inv_str, 7.5, 118, bold=True, r=0.06, g=0.46, b=0.43))
-                pc._streams.append(_text_line(y, cust_str, 7.5, 175, bold=True, r=0.15, g=0.20, b=0.30))
-                pc._streams.append(_text_line(y, prod_str, 7.5, 262, bold=True, r=0.06, g=0.09, b=0.16))
-                pc._streams.append(_text_right(y, qty_str, 7.5, 375, r=0.06, g=0.09, b=0.16))
-                pc._streams.append(_text_right(y, price_str, 7.5, 435, r=0.06, g=0.09, b=0.16))
-                pc._streams.append(_text_right(y, total_str, 7.5, 495, bold=True, r=0.06, g=0.09, b=0.16))
+                pc._streams.append(_text_line(y, date_str, 7.5, 60, r=0.2, g=0.2, b=0.2))
+                pc._streams.append(_text_line(y, inv_str, 7.5, 118, bold=True, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_line(y, cust_str, 7.5, 175, bold=True, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_line(y, prod_str, 7.5, 262, bold=True, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_right(y, qty_str, 7.5, 375, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_right(y, price_str, 7.5, 435, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_right(y, total_str, 7.5, 495, bold=True, r=0.0, g=0.0, b=0.0))
                 badge_x = 512
             else:
-                pc._streams.append(_text_line(y, date_str, 8, 64, r=0.28, g=0.33, b=0.41))
-                pc._streams.append(_text_line(y, inv_str, 8, 135, bold=True, r=0.06, g=0.46, b=0.43))
-                pc._streams.append(_text_line(y, prod_str, 8.5, 195, bold=True, r=0.06, g=0.09, b=0.16))
-                pc._streams.append(_text_right(y, qty_str, 8.5, 360, r=0.06, g=0.09, b=0.16))
-                pc._streams.append(_text_right(y, price_str, 8.5, 430, r=0.06, g=0.09, b=0.16))
-                pc._streams.append(_text_right(y, total_str, 8.5, 495, bold=True, r=0.06, g=0.09, b=0.16))
+                pc._streams.append(_text_line(y, date_str, 8, 64, r=0.2, g=0.2, b=0.2))
+                pc._streams.append(_text_line(y, inv_str, 8, 135, bold=True, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_line(y, prod_str, 8.5, 195, bold=True, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_right(y, qty_str, 8.5, 360, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_right(y, price_str, 8.5, 430, r=0.0, g=0.0, b=0.0))
+                pc._streams.append(_text_right(y, total_str, 8.5, 495, bold=True, r=0.0, g=0.0, b=0.0))
                 badge_x = 510
 
             if st_raw == 'PAID':
-                pc._streams.append(_badge(badge_x, y - 2, 'PAID', bg=(0.82, 0.98, 0.90), fg=(0.02, 0.37, 0.27), w=(40 if is_multi_customer else 44), h=13, size=6.5))
+                pc._streams.append(_badge(badge_x, y - 2, 'PAID', bg=(1.0, 1.0, 1.0), fg=(0.0, 0.0, 0.0), w=(40 if is_multi_customer else 44), h=13, size=6.5))
             elif st_raw == 'PARTIAL':
-                pc._streams.append(_badge(badge_x, y - 2, 'PARTIAL', bg=(0.99, 0.95, 0.78), fg=(0.57, 0.25, 0.05), w=(40 if is_multi_customer else 44), h=13, size=6.5))
+                pc._streams.append(_badge(badge_x, y - 2, 'PARTIAL', bg=(1.0, 1.0, 1.0), fg=(0.0, 0.0, 0.0), w=(40 if is_multi_customer else 44), h=13, size=6.5))
             else:
-                pc._streams.append(_badge(badge_x, y - 2, 'UNPAID', bg=(0.99, 0.89, 0.89), fg=(0.60, 0.11, 0.11), w=(40 if is_multi_customer else 44), h=13, size=6.5))
+                pc._streams.append(_badge(badge_x, y - 2, 'UNPAID', bg=(1.0, 1.0, 1.0), fg=(0.0, 0.0, 0.0), w=(40 if is_multi_customer else 44), h=13, size=6.5))
 
             pc.skip(18)
 
-    # ── Summary Box at End ──
-    pc.ensure(90)
+    # ── Summary Block at End (Clean Open Layout, No Box) ──
+    pc.ensure(110)
     pc.skip(10)
     y = pc.y
     box_w = 230.0
     box_x = 558.0 - box_w
-    box_h = 70.0
 
-    pc._streams.append(_rect_card(box_x, y - box_h, box_w, box_h, bg=(0.98, 0.985, 0.995), border=(0.85, 0.88, 0.92)))
-    pc._streams.append(_text_line(y - 18, 'TOTAL BILLED:', 9, box_x + 14, bold=True, r=0.39, g=0.45, b=0.55))
-    pc._streams.append(_text_line(y - 18, f'BDT {total_billed:.2f}', 10.5, box_x + 120, bold=True, r=0.06, g=0.09, b=0.16))
+    pc._streams.append(_line(54, y + 6, 558, y + 6, 0.0, 0.0, 0.0, 1.5))
+    pc._streams.append(_text_line(y - 12, 'TOTAL BILLED:', 9, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y - 12, f'BDT {total_billed:.2f}', 10.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
 
-    pc._streams.append(_text_line(y - 34, 'TOTAL PAID:', 9, box_x + 14, bold=True, r=0.39, g=0.45, b=0.55))
-    pc._streams.append(_text_line(y - 34, f'BDT {total_paid:.2f}', 10.5, box_x + 120, bold=True, r=0.02, g=0.37, b=0.27))
+    pc._streams.append(_text_line(y - 28, 'TOTAL PAID:', 9, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y - 28, f'BDT {total_paid:.2f}', 10.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
 
-    pc._streams.append(_line(box_x + 10, y - 44, box_x + box_w - 10, y - 44, 0.88, 0.91, 0.94, 0.5))
-    pc._streams.append(_text_line(y - 60, 'BALANCE DUE:', 9.5, box_x + 14, bold=True, r=0.60, g=0.11, b=0.11))
-    pc._streams.append(_text_line(y - 60, f'BDT {total_due:.2f}', 12, box_x + 120, bold=True, r=0.60, g=0.11, b=0.11))
+    pc._streams.append(_line(box_x, y - 36, 558, y - 36, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(y - 50, 'BALANCE DUE:', 9.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y - 50, f'BDT {total_due:.2f}', 11.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_line(54, y - 58, 558, y - 58, 0.0, 0.0, 0.0, 1.5))
 
-    pc.skip(box_h + 16)
+    # Statement Signatures (Manager & CEO Abdul Mannan)
+    stmt_sign_y = y - 88
+    pc._streams.append(_line(54, stmt_sign_y, 180, stmt_sign_y, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(stmt_sign_y - 10, "Manager Signature", 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
+
+    pc._streams.append(_line(400, stmt_sign_y, 558, stmt_sign_y, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(stmt_sign_y - 10, "CEO Abdul Mannan Signature", 8, 400, bold=True, r=0.0, g=0.0, b=0.0))
+
+    pc.skip(abs(y - stmt_sign_y) + 20)
     pc.finish()
     return builder.build()
 
 
 # ── 3. Sales Summary Report PDF ──────────────────────────────────────────────
 def build_sales_report_pdf(report_data: dict[str, Any]) -> bytes:
-    """Generate executive sales summary report PDF."""
+    """Generate executive sales summary report PDF in pure black & white."""
     qr_matrix = _build_qr_matrix(MAPS_URL)
     qr_cell = 1.05
 
@@ -790,14 +780,17 @@ def build_sales_report_pdf(report_data: dict[str, Any]) -> bytes:
     tot_paid = float(report_data.get("total_paid", 0))
     tot_due = float(report_data.get("total_due", 0))
     items_sold = int(report_data.get("total_items_sold", 0))
+    total_tx = int(report_data.get("total_transactions", 0))
+    sales_tx = report_data.get("sales_transactions") or []
+    product_sales = report_data.get("product_sales") or []
 
     def header(page_no: int) -> List[str]:
         ops = []
         if page_no == 1:
-            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.06, g=0.09, b=0.16))
-            ops.append(_text_line(748, 'SALES SUMMARY & PERFORMANCE REPORT', 8.5, 54, bold=True, r=0.06, g=0.46, b=0.43))
-            ops.append(_text_line(735, f'Period: {report_data["period_label"]}  |  Generated: {generated}', 8, 54, r=0.39, g=0.45, b=0.55))
-            ops.append(_text_line(723, f'Address: {MTRONIX_ADDRESS}', 8, 54, r=0.39, g=0.45, b=0.55))
+            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(748, 'SALES TRANSCRIPT & AUDIT REPORT', 8.5, 54, bold=True, r=0.2, g=0.2, b=0.2))
+            ops.append(_text_line(735, f'Period: {report_data["period_label"]}  |  Generated: {generated}', 8, 54, r=0.25, g=0.25, b=0.25))
+            ops.append(_text_line(723, f'Address: {MTRONIX_ADDRESS}', 8, 54, r=0.25, g=0.25, b=0.25))
 
             if qr_matrix:
                 qr_size = len(qr_matrix) * qr_cell
@@ -807,79 +800,122 @@ def build_sales_report_pdf(report_data: dict[str, Any]) -> bytes:
                 card_y = 712
                 qr_x = card_x + 7
                 qr_y = card_y + 4
-                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(0.98, 0.99, 1.0), border=(0.85, 0.88, 0.92)))
-                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.39, g=0.45, b=0.55))
+                ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(1.0, 1.0, 1.0), border=(0.0, 0.0, 0.0)))
+                ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.0, g=0.0, b=0.0))
                 ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y, qr_cell))
 
-            ops.append(_line(54, 710, 558, 710, r=0.06, g=0.09, b=0.16, width=1.5))
+            ops.append(_line(54, 710, 558, 710, r=0.0, g=0.0, b=0.0, width=1.5))
 
-            kpis = [
-                ('Total Revenue', f'BDT {tot_rev:.2f}', (0.06, 0.46, 0.43)),
-                ('Total Paid', f'BDT {tot_paid:.2f}', (0.02, 0.37, 0.27)),
-                ('Outstanding Due', f'BDT {tot_due:.2f}', (0.60, 0.11, 0.11) if tot_due > 0 else (0.06, 0.46, 0.43)),
-                ('Items Sold', str(items_sold), (0.06, 0.09, 0.16)),
-            ]
-            ops.extend(_render_kpi_cards(656, kpis, h=44))
         else:
-            ops.append(_text_line(760, f'Mtronix Sales Summary Report (Page {page_no})', 9, 54, bold=True, r=0.39, g=0.45, b=0.55))
-            ops.append(_line(54, 750, 558, 750, r=0.88, g=0.91, b=0.94, width=0.75))
+            ops.append(_text_line(760, f'Mtronix Sales Report & Transcript (Page {page_no})', 9, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, 750, 558, 750, r=0.0, g=0.0, b=0.0, width=0.75))
 
         return ops
 
     def footer(page_no: int, is_last: bool) -> List[str]:
         return _make_footer_ops(page_no, is_last)
 
-    builder = PdfBuilder()
-    pc = PageComposer(builder, header_fn=header, footer_fn=footer)
+    builder = PdfBuilder(auto_print=True)
+    pc = PageComposer(builder, header_fn=header, footer_fn=footer, page_top=690.0)
 
-    # ── Top Selling Products ──
-    pc.ensure(80)
-    pc.add_line('Top Selling Products (by Quantity)', 12, bold=True, r=0.06, g=0.09, b=0.16)
+    # ── Monthly Revenue / Performance Summary (Open Clean Layout, No Box) ──
+    pc.ensure(90)
+    pc.add_line('Revenue Performance Summary', 11, bold=True, r=0.0, g=0.0, b=0.0)
     pc.skip(6)
 
-    top_selling = report_data.get('top_selling') or []
-    if not top_selling:
-        pc.add_line('No sales recorded in this period.', 9.5, r=0.39, g=0.45, b=0.55)
-    else:
-        for idx, item in enumerate(top_selling[:5], 1):
-            sku_suffix = f' ({item["product__sku"]})' if item.get("product__sku") else ''
-            pname = _sanitize_text(f'{idx}. {item["product__name"]}{sku_suffix}')
-            line = f'{pname}   *   {item["total_qty"]} sold   |   BDT {item["total_sales"]:.2f}'
-            pc.add_line(line, 9.5, r=0.06, g=0.09, b=0.16)
+    y = pc.y
+    pc._streams.append(_line(54, y + 2, 558, y + 2, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(y - 12, 'TOTAL SALES INVOICED:', 8.5, 54, bold=True, r=0.25, g=0.25, b=0.25))
+    pc._streams.append(_text_line(y - 12, f'BDT {tot_rev:.2f}', 10.0, 205, bold=True, r=0.0, g=0.0, b=0.0))
 
-    pc.skip(10)
-    pc.add_divider()
-    pc.skip(8)
+    pc._streams.append(_text_line(y - 28, 'COLLECTED CASH / PAID:', 8.5, 54, bold=True, r=0.25, g=0.25, b=0.25))
+    pc._streams.append(_text_line(y - 28, f'BDT {tot_paid:.2f}', 10.0, 205, bold=True, r=0.0, g=0.0, b=0.0))
 
-    # ── Product Sales Breakdown ──
+    pc._streams.append(_text_line(y - 12, 'UNPAID RECEIVABLE DUE:', 8.5, 340, bold=True, r=0.25, g=0.25, b=0.25))
+    pc._streams.append(_text_line(y - 12, f'BDT {tot_due:.2f}', 10.0, 480, bold=True, r=0.0, g=0.0, b=0.0))
+
+    pc._streams.append(_text_line(y - 28, 'ORDERS / TOTAL UNITS:', 8.5, 340, bold=True, r=0.25, g=0.25, b=0.25))
+    pc._streams.append(_text_line(y - 28, f'{total_tx} Orders / {items_sold} Units', 10.0, 480, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_line(54, y - 36, 558, y - 36, 0.0, 0.0, 0.0, 1.0))
+    pc.skip(48)
+
+    # ── 1. Sales Transactions Transcript (Invoice Ledger) ──
     pc.ensure(80)
-    pc.add_line('Product Sales Breakdown', 12, bold=True, r=0.06, g=0.09, b=0.16)
-    pc.skip(8)
+    pc.add_line('Sales Transactions Audit Transcript', 11, bold=True, r=0.0, g=0.0, b=0.0)
+    pc.skip(6)
 
     y = pc.y
-    pc._streams.append(_rect_fill(54, y - 4, 504, 20, r=0.06, g=0.09, b=0.16))
-    pc._streams.append(_text_line(y + 2, 'PRODUCT NAME', 8.5, 66, bold=True, r=1.0, g=1.0, b=1.0))
-    pc._streams.append(_text_line(y + 2, 'SKU', 8.5, 270, bold=True, r=1.0, g=1.0, b=1.0))
-    pc._streams.append(_text_right(y + 2, 'QTY SOLD', 8.5, 390, bold=True, r=1.0, g=1.0, b=1.0))
-    pc._streams.append(_text_right(y + 2, 'TOTAL SALES (BDT)', 8.5, 550, bold=True, r=1.0, g=1.0, b=1.0))
+    pc._streams.append(_line(54, y + 12, 558, y + 12, 0.0, 0.0, 0.0, 1.5))
+    pc._streams.append(_text_line(y + 2, 'DATE & TIME', 8, 56, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_line(y + 2, 'INVOICE #', 8, 140, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_line(y + 2, 'CUSTOMER', 8, 220, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_line(y + 2, 'ITEMS SUMMARY', 8, 320, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y + 2, 'TOTAL', 8, 455, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y + 2, 'PAID', 8, 508, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y + 2, 'STATUS', 8, 554, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_line(54, y - 4, 558, y - 4, 0.0, 0.0, 0.0, 1.5))
     pc.skip(20)
 
-    product_sales = report_data.get('product_sales') or []
+    if not sales_tx:
+        pc.add_line('No sales transactions recorded in this period.', 9, r=0.25, g=0.25, b=0.25)
+        pc.skip(14)
+    else:
+        for idx, tx in enumerate(sales_tx):
+            pc.ensure(18)
+            y = pc.y
+            pc._streams.append(_line(54, y - 4, 558, y - 4, 0.85, 0.85, 0.85, 0.5))
+
+            pc._streams.append(_text_line(y, _sanitize_text(tx['date'])[:14], 8, 56, r=0.2, g=0.2, b=0.2))
+            pc._streams.append(_text_line(y, _sanitize_text(tx['code']), 8, 140, bold=True, r=0.0, g=0.0, b=0.0))
+            pc._streams.append(_text_line(y, _sanitize_text(tx['customer_name'])[:16], 8, 220, r=0.0, g=0.0, b=0.0))
+            pc._streams.append(_text_line(y, _sanitize_text(tx['items_summary'])[:22], 8, 320, r=0.25, g=0.25, b=0.25))
+            pc._streams.append(_text_right(y, f"{tx['total_amount']:.2f}", 8.5, 455, bold=True, r=0.0, g=0.0, b=0.0))
+            pc._streams.append(_text_right(y, f"{tx['paid_amount']:.2f}", 8.5, 508, r=0.0, g=0.0, b=0.0))
+
+            status_txt = 'PAID' if tx['payment_status'] == 'PAID' else ('PARTIAL' if tx['payment_status'] == 'PARTIAL' else 'UNPAID')
+            pc._streams.append(_text_right(y, status_txt, 7.5, 554, bold=True, r=0.0, g=0.0, b=0.0))
+            pc.skip(18)
+
+    pc.skip(14)
+
+    # ── 2. Product Sales Breakdown ──
+    pc.ensure(80)
+    pc.add_line('Product Sales Volume Breakdown', 11, bold=True, r=0.0, g=0.0, b=0.0)
+    pc.skip(6)
+
+    y = pc.y
+    pc._streams.append(_line(54, y + 12, 558, y + 12, 0.0, 0.0, 0.0, 1.5))
+    pc._streams.append(_text_line(y + 2, 'PRODUCT NAME', 8.5, 66, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_line(y + 2, 'SKU', 8.5, 290, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y + 2, 'QTY SOLD', 8.5, 410, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y + 2, 'TOTAL SALES (BDT)', 8.5, 550, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_line(54, y - 4, 558, y - 4, 0.0, 0.0, 0.0, 1.5))
+    pc.skip(20)
+
     if not product_sales:
-        pc.add_line('No product breakdown available.', 9.5, r=0.39, g=0.45, b=0.55)
+        pc.add_line('No product breakdown available.', 9.5, r=0.25, g=0.25, b=0.25)
     else:
         for idx, item in enumerate(product_sales):
             pc.ensure(18)
             y = pc.y
-            if idx % 2 == 1:
-                pc._streams.append(_rect_fill(54, y - 4, 504, 18, 0.975, 0.985, 0.995))
-            pc._streams.append(_line(54, y - 4, 558, y - 4, 0.90, 0.92, 0.95, 0.5))
+            pc._streams.append(_line(54, y - 4, 558, y - 4, 0.80, 0.80, 0.80, 0.5))
 
-            pc._streams.append(_text_line(y, _sanitize_text(item['product__name'])[:30], 9, 66, bold=True, r=0.06, g=0.09, b=0.16))
-            pc._streams.append(_text_line(y, _sanitize_text(item.get('product__sku') or '-'), 8.5, 270, r=0.39, g=0.45, b=0.55))
-            pc._streams.append(_text_right(y, str(item['total_qty']), 9, 390, r=0.06, g=0.09, b=0.16))
-            pc._streams.append(_text_right(y, f"{item['total_sales']:.2f}", 9.5, 550, bold=True, r=0.06, g=0.09, b=0.16))
+            pc._streams.append(_text_line(y, _sanitize_text(item['product__name'])[:34], 9, 66, bold=True, r=0.0, g=0.0, b=0.0))
+            pc._streams.append(_text_line(y, _sanitize_text(item.get('product__sku') or '-'), 8.5, 290, r=0.25, g=0.25, b=0.25))
+            pc._streams.append(_text_right(y, str(item['total_qty']), 9, 410, r=0.0, g=0.0, b=0.0))
+            pc._streams.append(_text_right(y, f"{item['total_sales']:.2f}", 9.5, 550, bold=True, r=0.0, g=0.0, b=0.0))
             pc.skip(18)
+
+    # Report Signatures (Manager & CEO Abdul Mannan)
+    pc.ensure(60)
+    pc.skip(18)
+    rep_sign_y = pc.y
+    pc._streams.append(_line(54, rep_sign_y, 180, rep_sign_y, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(rep_sign_y - 10, "Manager Signature", 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
+
+    pc._streams.append(_line(400, rep_sign_y, 558, rep_sign_y, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(rep_sign_y - 10, "CEO Abdul Mannan Signature", 8, 400, bold=True, r=0.0, g=0.0, b=0.0))
+    pc.skip(24)
 
     pc.finish()
     return builder.build()

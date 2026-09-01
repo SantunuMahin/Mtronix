@@ -1,520 +1,639 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt #SALE-{{ sale.pk|stringformat:"05d" }} - Mtronix</title>
+    <title>Invoice #SALE-{{ sale.pk|stringformat:"05d" }} - Mtronix</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f1f5f9;
-            color: #0f172a;
-            padding: 30px 16px;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f3f4f6;
+            color: #000000;
+            padding: 24px 16px;
             display: flex;
             flex-direction: column;
             align-items: center;
             -webkit-font-smoothing: antialiased;
         }
 
-        /* ── Toolbar ────────────────────────────────────────── */
+        /* ── Top Action Toolbar ────────────────────────────── */
         .toolbar {
             width: 100%;
-            max-width: 440px;
+            max-width: 820px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 18px;
+            gap: 12px;
+            margin-bottom: 16px;
         }
+
         .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
-            padding: 9px 16px;
+            padding: 9px 18px;
             font-size: 13px;
-            font-weight: 600;
-            border-radius: 8px;
+            font-weight: 700;
+            border-radius: 6px;
             cursor: pointer;
             text-decoration: none;
-            border: 1px solid transparent;
+            border: 1px solid #000000;
             transition: all 0.15s ease;
         }
+
         .btn-primary {
-            background-color: #0f766e;
+            background-color: #000000;
             color: #ffffff;
-            box-shadow: 0 2px 4px rgba(15,118,110,0.2);
         }
+
         .btn-primary:hover {
-            background-color: #115e59;
+            background-color: #333333;
         }
+
         .btn-secondary {
             background-color: #ffffff;
-            color: #334155;
-            border-color: #cbd5e1;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        .btn-secondary:hover {
-            background-color: #f8fafc;
-            border-color: #94a3b8;
+            color: #000000;
         }
 
-        /* ── Receipt Card ────────────────────────────────────── */
-        .receipt-card {
+        .btn-secondary:hover {
+            background-color: #f3f4f6;
+        }
+
+        /* ── Standard A4 Monochrome Invoice Sheet ──────────── */
+        .invoice-sheet {
             background: #ffffff;
             width: 100%;
-            max-width: 440px;
-            padding: 32px 28px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
-            border: 1px solid #e2e8f0;
-            position: relative;
+            max-width: 820px;
+            min-height: 1050px;
+            padding: 40px 44px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+            border: 1px solid #d1d5db;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
-        /* ── Header ─────────────────────────────────────────── */
-        .receipt-header-wrap {
+        /* ── Header ────────────────────────────────────────── */
+        .invoice-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 12px;
-            border-bottom: 1.5px dashed #cbd5e1;
+            gap: 20px;
             padding-bottom: 16px;
-            margin-bottom: 16px;
+            border-bottom: 2px solid #000000;
+            margin-bottom: 18px;
         }
-        .receipt-header {
-            flex: 1;
-            text-align: left;
-        }
-        .receipt-header h1 {
-            font-size: 22px;
+
+        .brand-info h1 {
+            font-size: 28px;
             font-weight: 800;
-            letter-spacing: 1.5px;
-            color: #0f172a;
-            margin-bottom: 2px;
+            letter-spacing: 2px;
+            color: #000000;
             text-transform: uppercase;
+            line-height: 1.1;
         }
-        .receipt-subtitle {
+
+        .brand-subtitle {
             font-size: 11px;
             font-weight: 700;
             letter-spacing: 1.2px;
-            color: #0f766e;
+            color: #333333;
             text-transform: uppercase;
-            margin-bottom: 6px;
+            margin: 4px 0 6px;
+            display: block;
+        }
+
+        .brand-meta {
+            font-size: 12px;
+            color: #333333;
+            line-height: 1.45;
+        }
+
+        .brand-meta strong {
+            color: #000000;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            text-align: right;
+        }
+
+        .invoice-title-block h2 {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #000000;
+            text-transform: uppercase;
+        }
+
+        .invoice-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 700;
+            color: #000000;
+            margin-top: 2px;
+        }
+
+        .invoice-date {
+            font-size: 12px;
+            color: #4b5563;
+            margin-top: 2px;
+        }
+
+        .payment-badge {
             display: inline-block;
-        }
-        .receipt-header p {
-            font-size: 11.5px;
-            color: #475569;
-            line-height: 1.4;
-        }
-        .receipt-header .contact {
             font-size: 11px;
-            font-weight: 500;
-            color: #334155;
-            margin-top: 3px;
+            font-weight: 800;
+            letter-spacing: 0.75px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            margin-top: 6px;
+            border: 1.5px solid #000000;
+            color: #000000;
+            background-color: #ffffff;
         }
-        .receipt-qr-top {
+
+        .qr-box {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 5px;
-            background: #f8fafc;
-            border: 1px dashed #cbd5e1;
-            border-radius: 8px;
             text-align: center;
-            flex-shrink: 0;
+            border: 1px solid #000000;
+            padding: 4px 6px;
+            border-radius: 4px;
+            background: #ffffff;
         }
-        .receipt-qr-top img {
+
+        .qr-box img {
             width: 58px;
             height: 58px;
             display: block;
             image-rendering: pixelated;
         }
-        .receipt-qr-top span {
+
+        .qr-box span {
             font-size: 8px;
             font-weight: 700;
-            color: #475569;
-            margin-top: 3px;
+            color: #000000;
+            margin-top: 2px;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.5px;
         }
 
-        /* ── Meta Details ────────────────────────────────────── */
-        .receipt-meta {
-            font-size: 12.5px;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 12px;
-            margin-bottom: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .meta-row {
+        /* ── Customer / Meta 2-Column Section ──────────────── */
+        .meta-section {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-        }
-        .meta-label {
-            color: #64748b;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 600;
-        }
-        .meta-value {
-            font-weight: 600;
-            color: #0f172a;
-            font-family: 'Inter', sans-serif;
-        }
-        .meta-value.invoice-id {
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 700;
-            color: #0f766e;
-        }
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 3px 9px;
-            border-radius: 6px;
-            font-size: 11.5px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .status-paid {
-            background-color: #d1fae5;
-            color: #065f46;
-            border: 1px solid #a7f3d0;
-        }
-        .status-partial {
-            background-color: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fde68a;
-        }
-        .status-unpaid {
-            background-color: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fecaca;
+            gap: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px dashed #000000;
+            margin-bottom: 18px;
         }
 
-        /* ── Items Table ─────────────────────────────────────── */
+        .meta-col {
+            flex: 1;
+        }
+
+        .meta-label {
+            font-size: 11px;
+            font-weight: 800;
+            color: #000000;
+            text-transform: uppercase;
+            letter-spacing: 0.75px;
+            margin-bottom: 4px;
+        }
+
+        .cust-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: #000000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cust-tag {
+            font-size: 10px;
+            font-weight: 700;
+            color: #000000;
+            background: #ffffff;
+            border: 1px solid #000000;
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+
+        .cust-details {
+            font-size: 12.5px;
+            color: #333333;
+            margin-top: 3px;
+            line-height: 1.4;
+        }
+
+        .cust-details strong {
+            color: #000000;
+        }
+
+        /* ── Line Items Table ──────────────────────────────── */
+        .items-table-wrap {
+            flex: 1;
+            margin-bottom: 18px;
+        }
+
         .items-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            margin-bottom: 14px;
+            color: #000000;
         }
+
         .items-table th {
             text-align: left;
-            font-weight: 700;
-            color: #475569;
-            border-bottom: 1.5px solid #0f172a;
-            padding: 8px 0;
+            font-weight: 800;
+            color: #000000;
+            border-top: 1.5px solid #000000;
+            border-bottom: 1.5px solid #000000;
+            padding: 8px 6px;
             font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.5px;
         }
-        .items-table th.num, .items-table td.num {
+
+        .items-table th.num,
+        .items-table td.num {
             text-align: right;
             font-variant-numeric: tabular-nums;
         }
+
         .items-table td {
-            padding: 9px 0;
-            border-bottom: 1px dashed #e2e8f0;
+            padding: 9px 6px;
+            border-bottom: 1px dashed #d1d5db;
             vertical-align: top;
-            color: #1e293b;
+            color: #000000;
         }
-        .item-name {
+
+        .item-title {
             font-weight: 600;
-            color: #0f172a;
+            color: #000000;
             display: block;
-            line-height: 1.35;
+            line-height: 1.3;
         }
-        .item-tags {
-            display: flex;
-            gap: 6px;
-            margin-top: 2px;
-            flex-wrap: wrap;
-        }
-        .item-sku {
+
+        .item-sub {
             font-size: 11px;
-            color: #64748b;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .item-group {
-            font-size: 10px;
-            color: #0284c7;
-            background: #f0f9ff;
-            padding: 1px 4px;
-            border-radius: 3px;
-            font-weight: 500;
+            color: #4b5563;
+            margin-top: 2px;
         }
 
-        /* ── Totals ──────────────────────────────────────────── */
-        .totals-section {
-            border-top: 2px dashed #0f172a;
-            border-bottom: 1.5px dashed #cbd5e1;
-            padding: 14px 0;
-            margin-bottom: 16px;
-        }
-        .total-summary-row {
+        /* ── Financial Summary & Signatures ────────────────── */
+        .bottom-section {
             display: flex;
             justify-content: space-between;
-            font-size: 12px;
-            color: #64748b;
-            margin-bottom: 6px;
-        }
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 18px;
-            font-weight: 800;
-            color: #0f172a;
-            letter-spacing: -0.2px;
-        }
-        .total-row .amount {
-            color: #0f766e;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 800;
+            align-items: flex-start;
+            gap: 32px;
+            border-top: 1.5px solid #000000;
+            padding-top: 16px;
+            margin-bottom: 24px;
         }
 
-        /* ── Store Greeting ─────────────────────────────────── */
-        .receipt-footer {
-            text-align: center;
-            padding: 4px 0 14px;
-        }
-        .receipt-footer .greeting {
-            font-size: 13px;
-            font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 3px;
-        }
-        .receipt-footer .tagline {
+        .terms-block {
+            flex: 1.1;
             font-size: 11.5px;
-            color: #64748b;
-        }
-
-        /* ── Store QR Code ───────────────────────────────────── */
-        .receipt-qr {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 12px 14px;
-            background: #f8fafc;
-            border: 1px dashed #cbd5e1;
-            border-radius: 8px;
-            margin: 6px 0 16px;
-            text-align: center;
-        }
-        .receipt-qr img {
-            width: 56px;
-            height: 56px;
-            display: block;
-            margin: 0 auto 5px;
-            image-rendering: pixelated;
-        }
-        .receipt-qr span {
-            font-size: 10.5px;
-            color: #475569;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-        }
-
-        /* ── Provider Info Box ───────────────────────────────── */
-        .provider-info {
-            text-align: center;
-            padding-top: 10px;
-            border-top: 1px solid #f1f5f9;
-            font-size: 10px;
-            color: #94a3b8;
+            color: #333333;
             line-height: 1.5;
         }
-        .provider-info strong {
-            color: #64748b;
-            font-weight: 600;
+
+        .terms-block h4 {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #000000;
+            margin-bottom: 4px;
         }
 
-        /* ── Print Media Optimization ────────────────────────── */
+        .signatures-grid {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 48px;
+            padding-right: 20px;
+        }
+
+        .sign-box {
+            text-align: center;
+            border-top: 1.5px solid #000000;
+            padding-top: 6px;
+            width: 140px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #000000;
+        }
+
+        .totals-block {
+            flex: 0.9;
+            max-width: 320px;
+            width: 100%;
+        }
+
+        .tot-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #000000;
+            padding: 4px 0;
+        }
+
+        .tot-row.grand-total {
+            font-size: 15px;
+            font-weight: 800;
+            color: #000000;
+            border-bottom: 1.5px solid #000000;
+            padding-bottom: 6px;
+            margin-bottom: 4px;
+        }
+
+        .tot-row.grand-total .amount {
+            color: #000000;
+            font-size: 16px;
+        }
+
+        .tot-row.paid {
+            font-weight: 600;
+            color: #000000;
+        }
+
+        .tot-row.due {
+            font-weight: 800;
+            color: #000000;
+            font-size: 14px;
+            border-top: 1.5px solid #000000;
+            margin-top: 4px;
+            padding-top: 4px;
+        }
+
+        /* Returning Customer Details (Black and White) */
+        .prev-orders-box {
+            border-top: 1px dashed #000000;
+            padding-top: 8px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #000000;
+        }
+
+        /* ── Footer ────────────────────────────────────────── */
+        .invoice-footer {
+            text-align: center;
+            padding-top: 12px;
+            border-top: 1px solid #000000;
+            font-size: 11px;
+            color: #4b5563;
+            line-height: 1.4;
+        }
+
+        /* ── Print Optimization for Canon LBP 6030 (A4 Laser) ── */
         @media print {
             body {
                 background: #ffffff !important;
                 padding: 0 !important;
                 color: #000000 !important;
             }
+
             .toolbar {
                 display: none !important;
             }
-            .receipt-card {
+
+            .invoice-sheet {
                 max-width: 100% !important;
                 width: 100% !important;
+                min-height: auto !important;
                 box-shadow: none !important;
                 border: none !important;
-                padding: 4px 6px !important;
+                padding: 0 !important;
                 border-radius: 0 !important;
             }
-            .receipt-header h1 {
-                color: #000 !important;
+
+            .items-table th,
+            .items-table td,
+            .invoice-header,
+            .bottom-section,
+            .meta-section {
+                border-color: #000000 !important;
             }
-            .receipt-subtitle {
-                color: #000 !important;
+
+            .tot-row.grand-total .amount,
+            .invoice-num {
+                color: #000000 !important;
             }
-            .total-row .amount {
-                color: #000 !important;
-            }
-            .receipt-qr {
-                background: transparent !important;
-                border-color: #000 !important;
-            }
+
             @page {
-                margin: 4mm 4mm;
-                size: auto;
+                size: A4 portrait;
+                margin: 12mm 15mm 15mm 15mm;
             }
         }
     </style>
 </head>
+
 <body>
+    <!-- Top Action Toolbar -->
     <div class="toolbar">
-        <a href="{% url 'sales:list' %}" class="btn btn-secondary">← Back to Sales</a>
+        <a href="{% url 'sales:list' %}" class="btn btn-secondary">&larr; Back to Sales</a>
         <div style="display: flex; gap: 8px;">
-            <a href="{% url 'sales:receipt_pdf' sale.pk %}" class="btn btn-secondary" target="_blank">PDF Copy</a>
-            <button onclick="window.print()" class="btn btn-primary">🖨️ Print Direct</button>
+            <a href="{% url 'sales:receipt_pdf' sale.pk %}" class="btn btn-secondary" target="_blank">📄 Download
+                PDF</a>
+            <button onclick="window.print()" class="btn btn-primary">🖨️ Print Invoice (A4)</button>
         </div>
     </div>
 
-    <div class="receipt-card">
-        <!-- Brand Header with Top Right QR -->
-        <div class="receipt-header-wrap">
-            <div class="receipt-header">
-                <h1>MTRONIX</h1>
-                <span class="receipt-subtitle">Electronics & Parts</span>
-                <p>Ibrahim Electric & Electronics Market</p>
-                <p>124 BCC Road, Dhaka, Bangladesh</p>
-                <p class="contact">Phone: 01706-970195 &bull; mannanelectronics111@gmail.com</p>
-            </div>
-            {% if qr_code_b64 %}
-            <div class="receipt-qr-top">
-                <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR">
-                <span>Scan Location</span>
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- Receipt Meta -->
-        <div class="receipt-meta">
-            <div class="meta-row">
-                <span class="meta-label">Receipt No</span>
-                <span class="meta-value invoice-id">SALE-{{ sale.pk|stringformat:"05d" }}</span>
-            </div>
-            <div class="meta-row">
-                <span class="meta-label">Date & Time</span>
-                <span class="meta-value">{{ sale.sold_at|date:"d M Y, h:i A" }}</span>
-            </div>
-            <div class="meta-row">
-                <span class="meta-label">Customer</span>
-                <span class="meta-value">{{ sale.customer_name|default:"Walk-in Customer" }}</span>
-            </div>
-            {% if sale.customer_phone %}
-            <div class="meta-row">
-                <span class="meta-label">Phone</span>
-                <span class="meta-value">{{ sale.customer_phone }}</span>
-            </div>
-            {% endif %}
-            {% if sale.customer_address %}
-            <div class="meta-row">
-                <span class="meta-label">Address</span>
-                <span class="meta-value">{{ sale.customer_address }}</span>
-            </div>
-            {% endif %}
-            <div class="meta-row" style="margin-top: 4px;">
-                <span class="meta-label">Payment Status</span>
-                {% if sale.is_paid %}
-                <span class="status-badge status-paid">✓ PAID</span>
-                {% elif sale.is_partial %}
-                <span class="status-badge status-partial">🌓 PARTIAL PAYMENT</span>
-                {% else %}
-                <span class="status-badge status-unpaid">⏳ UNPAID / DUE</span>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Items Table -->
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th>Item Description</th>
-                    <th class="num">Qty</th>
-                    <th class="num">Price</th>
-                    <th class="num">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in sale.items.all %}
-                <tr>
-                    <td>
-                        <span class="item-name">{{ item.display_name }}</span>
-                        <div class="item-tags">
-                            {% if item.product and item.product.group %}
-                            <span class="item-group">{{ item.product.group.name }}</span>
-                            {% elif not item.product %}
-                            <span class="item-group" style="background: #fef3c7; color: #92400e;">Custom Item</span>
-                            {% endif %}
-                            {% if item.sku %}
-                            <span class="item-sku">SKU: {{ item.sku }}</span>
+    <!-- Standard A4 Invoice Sheet (Black & White) -->
+    <div class="invoice-sheet">
+        <div>
+            <!-- Header -->
+            <div class="invoice-header">
+                <div class="brand-info">
+                    <h1>MTRONIX</h1>
+                    <span class="brand-subtitle">Electronics, Hardware & Components</span>
+                    <div class="brand-meta">
+                        <p>44/45, KaftanBazar Madina Electric & Electronics, (2nd floor), shop no-3,4. Wari, Dhaka.</p>
+                        <p><strong>Phone:</strong> 01744676770 &bull; <strong>Email:</strong> mtronix1203@gmail.com</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="invoice-title-block">
+                        <h2>SALES INVOICE</h2>
+                        <div class="invoice-num">SALE-{{ sale.pk|stringformat:"05d" }}</div>
+                        <div class="invoice-date">Date: {{ sale.sold_at|date:"d M Y, h:i A" }}</div>
+                        <div>
+                            {% if sale.is_paid %}
+                            <span class="payment-badge">PAID</span>
+                            {% elif sale.is_partial %}
+                            <span class="payment-badge">PARTIAL PAYMENT</span>
+                            {% else %}
+                            <span class="payment-badge">UNPAID / DUE</span>
                             {% endif %}
                         </div>
-                    </td>
-                    <td class="num">{{ item.quantity }}</td>
-                    <td class="num">BDT {{ item.unit_price|floatformat:2 }}</td>
-                    <td class="num">BDT {{ item.total_amount|floatformat:2 }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    </div>
+                    {% if qr_code_b64 %}
+                    <div class="qr-box">
+                        <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store QR">
+                        <span>Store Location</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
 
-        <!-- Totals -->
-        <div class="totals-section">
-            <div class="total-summary-row">
-                <span>Total Items: {{ sale.items.count }}</span>
-                <span>Status: {% if sale.is_paid %}<strong style="color: #065f46;">Paid</strong>{% elif sale.is_partial %}<strong style="color: #92400e;">Partial (Due: ৳{{ sale.due_amount|floatformat:2 }})</strong>{% else %}<strong style="color: #991b1b;">Unpaid</strong>{% endif %}</span>
+            <!-- Customer & Invoice Meta -->
+            <div class="meta-section">
+                <div class="meta-col">
+                    <div class="meta-label">Billed To</div>
+                    <div class="cust-name">
+                        <span>{{ sale.customer_name|default:"Walk-in Customer" }}</span>
+                        {% if prev_history and prev_history.has_previous_orders %}
+                        <span class="cust-tag">Returning Customer (Order #{{ prev_history.previous_orders_count|add:1 }})</span>
+                        {% endif %}
+                    </div>
+                    <div class="cust-details">
+                        {% if sale.customer_phone %}
+                        <p><strong>Phone:</strong> {{ sale.customer_phone }}</p>
+                        {% endif %}
+                        {% if sale.customer_address %}
+                        <p><strong>Address:</strong> {{ sale.customer_address }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="meta-col" style="text-align: right;">
+                    <div class="meta-label">Invoice Details</div>
+                    <div class="cust-details">
+                        <p><strong>Invoice No:</strong> SALE-{{ sale.pk|stringformat:"05d" }}</p>
+                        <p><strong>Issue Date:</strong> {{ sale.sold_at|date:"d M Y, h:i A" }}</p>
+                        <p><strong>Payment Status:</strong> {{ sale.get_payment_status_display }}</p>
+                    </div>
+                </div>
             </div>
-            <div class="total-row">
-                <span>TOTAL AMOUNT:</span>
-                <span class="amount">BDT {{ sale.total_amount|floatformat:2 }}</span>
+
+            <!-- Line Items Table -->
+            <div class="items-table-wrap">
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 35px; text-align: center;">#</th>
+                            <th>Item & Description</th>
+                            <th style="width: 140px;">SKU / Group</th>
+                            <th class="num" style="width: 65px;">Qty</th>
+                            <th class="num" style="width: 110px;">Unit Price (BDT)</th>
+                            <th class="num" style="width: 120px;">Amount (BDT)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in sale.items.all %}
+                        <tr>
+                            <td style="text-align: center; color: #4b5563; font-size: 12px;">{{ forloop.counter }}</td>
+                            <td>
+                                <span class="item-title">{{ item.display_name }}</span>
+                            </td>
+                            <td>
+                                <span class="item-sub">
+                                    {% if item.sku %}
+                                    {{ item.sku }}
+                                    {% endif %}
+                                    {% if item.product and item.product.group %}
+                                    &bull; {{ item.product.group.name }}
+                                    {% elif not item.product %}
+                                    Custom Item
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td class="num" style="font-weight: 600;">{{ item.quantity }}</td>
+                            <td class="num">{{ item.unit_price|floatformat:2 }}</td>
+                            <td class="num" style="font-weight: 700;">{{ item.total_amount|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <div class="total-summary-row" style="margin-top: 6px; font-size: 13px;">
-                <span>PAID AMOUNT:</span>
-                <span style="font-weight: 700; color: #065f46;">BDT {{ sale.effective_paid_amount|floatformat:2 }}</span>
+
+            <!-- Financial Summary & Signatures -->
+            <div class="bottom-section">
+                <!-- Left: Terms & Signatures -->
+                <div class="terms-block">
+                    <h4>Terms & Conditions</h4>
+                    <p>&bull; Goods once sold can be checked upon receipt. Please keep this invoice for warranty and
+                        support.</p>
+                    <p>&bull; For inquiries, contact Mtronix: 01744676770.</p>
+
+                    <div class="signatures-grid">
+                        <div class="sign-box">Customer's Signature</div>
+                        <div class="sign-box">Authorized Signature</div>
+                    </div>
+                </div>
+
+                <!-- Right: Totals -->
+                <div class="totals-block">
+                    <div class="tot-row grand-total">
+                        <span>TOTAL AMOUNT:</span>
+                        <span class="amount">BDT {{ sale.total_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="tot-row paid">
+                        <span>PAID AMOUNT:</span>
+                        <span>BDT {{ sale.effective_paid_amount|floatformat:2 }}</span>
+                    </div>
+                    {% if sale.due_amount > 0 %}
+                    <div class="tot-row due">
+                        <span>BALANCE DUE:</span>
+                        <span>BDT {{ sale.due_amount|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Customer Previous Order Details (Returning Customer Context) -->
+                    {% if prev_history and prev_history.has_previous_orders %}
+                    <div class="prev-orders-box">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                            <span style="font-weight: 700;">Previous Purchases ({{ prev_history.previous_orders_count }} order{% if prev_history.previous_orders_count > 1 %}s{% endif %}):</span>
+                            <span style="font-weight: 700;">BDT {{ prev_history.previous_total_billed|floatformat:2 }}</span>
+                        </div>
+                        {% if prev_history.previous_total_due > 0 %}
+                        <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 2px;">
+                            <span>Previous Unpaid Due:</span>
+                            <span>BDT {{ prev_history.previous_total_due|floatformat:2 }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-weight: 800; padding-top: 4px; border-top: 1.5px solid #000000; margin-top: 4px; font-size: 13px;">
+                            <span>NET TOTAL OUTSTANDING DUE:</span>
+                            <span>BDT {{ prev_history.net_due|floatformat:2 }}</span>
+                        </div>
+                        {% endif %}
+                        {% if prev_history.last_previous_order_date and prev_history.recent_previous_orders %}
+                        <div style="margin-top: 5px; font-size: 11px; color: #4b5563;">
+                            <span style="font-weight: 600;">Last Bought ({{ prev_history.last_previous_order_date }}):</span>
+                            <span>{{ prev_history.recent_previous_orders.0.items_summary }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-            {% if sale.due_amount > 0 %}
-            <div class="total-summary-row" style="margin-top: 4px; color: #991b1b; font-weight: 800; font-size: 14px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
-                <span>BALANCE DUE:</span>
-                <span>BDT {{ sale.due_amount|floatformat:2 }}</span>
-            </div>
-            {% endif %}
         </div>
 
-        <!-- Store Greeting -->
-        <div class="receipt-footer">
-            <p class="greeting">Thank you for your purchase!</p>
-            <p class="tagline">Mtronix &mdash; Your trusted electronics partner</p>
-        </div>
-
-        <!-- Provider Info -->
-        <div class="provider-info">
-            <p>This is a computer-generated receipt.</p>
-            <p>Software Provider: <strong>Intlisoft Innovation</strong> &bull; Ph: 01888-735883</p>
-            <p>info.intlisoftinnovation@gmail.com</p>
+        <!-- Footer -->
+        <div class="invoice-footer">
+            <p>Thank you for doing business with Mtronix!</p>
+            <p style="font-size: 10px; color: #6b7280; margin-top: 2px;">Computer-generated invoice &bull; Software by
+                Intlisoft Innovation (01888-735883)</p>
         </div>
     </div>
 
@@ -526,4 +645,5 @@
         });
     </script>
 </body>
+
 </html>

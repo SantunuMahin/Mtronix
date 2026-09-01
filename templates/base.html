@@ -9,8 +9,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/app.css' %}">
-    <script src="{% static 'js/app.js' %}" defer></script>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=2.5">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="{% static 'js/app.js' %}?v=2.5" defer></script>
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <aside class="sidebar">
@@ -82,9 +84,13 @@
         </div>
         {% endif %}
 
+        <!-- Toast container for copy and live feedback -->
+        <div id="mtronix-toast-container" class="toast-container" aria-live="polite"></div>
+
         <main>
             {% block content %}{% endblock %}
         </main>
     </div>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

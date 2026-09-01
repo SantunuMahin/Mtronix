@@ -6,13 +6,13 @@
     <title>Statement - {{ customer_name }} - Mtronix</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f1f5f9;
-            color: #0f172a;
+            background-color: #f3f4f6;
+            color: #000000;
             padding: 30px 16px;
             display: flex;
             flex-direction: column;
@@ -50,49 +50,47 @@
             padding: 8px 14px;
             font-size: 13px;
             font-weight: 600;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             text-decoration: none;
-            border: 1px solid transparent;
+            border: 1px solid #000000;
             transition: all 0.15s ease;
             font-family: inherit;
         }
         .btn-primary {
-            background-color: #0f766e;
+            background-color: #000000;
             color: #ffffff;
-            box-shadow: 0 2px 4px rgba(15,118,110,0.2);
         }
-        .btn-primary:hover { background-color: #115e59; }
+        .btn-primary:hover { background-color: #333333; }
         .btn-secondary {
             background-color: #ffffff;
-            color: #334155;
-            border-color: #cbd5e1;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            color: #000000;
+            border-color: #000000;
         }
-        .btn-secondary:hover { background-color: #f8fafc; border-color: #94a3b8; }
+        .btn-secondary:hover { background-color: #f3f4f6; }
         .btn-pill {
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 12px;
             background: #ffffff;
-            border: 1px solid #cbd5e1;
-            color: #475569;
+            border: 1px solid #9ca3af;
+            color: #000000;
         }
         .btn-pill.active {
-            background: #0f766e;
+            background: #000000;
             color: #ffffff;
-            border-color: #0f766e;
+            border-color: #000000;
         }
 
-        /* ── Statement Card ── */
+        /* ── Statement Sheet ── */
         .statement-card {
             background: #ffffff;
             width: 100%;
             max-width: 800px;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
-            border: 1px solid #e2e8f0;
+            padding: 36px 40px;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border: 1px solid #000000;
         }
 
         /* Header */
@@ -100,19 +98,19 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            border-bottom: 2px solid #0f172a;
-            padding-bottom: 20px;
-            margin-bottom: 24px;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
         }
         .brand-title {
-            font-size: 26px;
-            font-weight: 800;
-            color: #0f172a;
-            letter-spacing: 1px;
+            font-size: 24px;
+            font-weight: 900;
+            color: #000000;
+            letter-spacing: 0.5px;
         }
         .brand-sub {
-            font-size: 12px;
-            color: #64748b;
+            font-size: 11.5px;
+            color: #374151;
             margin-top: 4px;
             line-height: 1.4;
         }
@@ -120,193 +118,200 @@
             text-align: right;
         }
         .doc-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 800;
-            color: #0f766e;
+            color: #000000;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .doc-date {
-            font-size: 12px;
-            color: #64748b;
-            margin-top: 4px;
+            font-size: 11.5px;
+            color: #374151;
+            margin-top: 3px;
         }
 
-        /* Customer Box */
+        /* Customer Info (Open Linear Layout) */
         .info-grid {
             display: grid;
             grid-template-columns: 1.2fr 1fr;
             gap: 20px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px 20px;
-            margin-bottom: 24px;
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+            border-bottom: 1px dashed #9ca3af;
         }
         .info-col h3 {
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            color: #64748b;
-            margin-bottom: 6px;
+            color: #4b5563;
+            margin-bottom: 4px;
+            font-weight: 700;
         }
         .info-name {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 700;
-            color: #0f172a;
+            color: #000000;
         }
         .info-detail {
-            font-size: 13px;
-            color: #334155;
+            font-size: 12.5px;
+            color: #1f2937;
             margin-top: 2px;
         }
 
-        /* Summary Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
+        /* Summary Line (Open Monochrome Header Bar, No Box) */
+        .summary-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1.5px solid #000000;
+            border-bottom: 1.5px solid #000000;
+            padding: 10px 0;
             margin-bottom: 24px;
         }
-        .stat-box {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 14px;
-            text-align: center;
+        .summary-item {
+            text-align: left;
         }
-        .stat-box.highlight {
-            background: #f0fdf4;
-            border-color: #bbf7d0;
+        .summary-item:last-child {
+            text-align: right;
         }
-        .stat-box.due-box {
-            background: #fef2f2;
-            border-color: #fecaca;
-        }
-        .stat-box .stat-label {
-            font-size: 11px;
+        .summary-label {
+            display: block;
+            font-size: 10.5px;
+            font-weight: 700;
             text-transform: uppercase;
-            font-weight: 600;
-            color: #64748b;
+            color: #4b5563;
             letter-spacing: 0.5px;
+            margin-bottom: 2px;
         }
-        .stat-box .stat-val {
-            font-size: 20px;
+        .summary-val {
+            font-size: 17px;
             font-weight: 800;
-            color: #0f172a;
-            margin-top: 4px;
+            color: #000000;
             font-family: 'JetBrains Mono', monospace;
         }
-        .stat-box.highlight .stat-val { color: #065f46; }
-        .stat-box.due-box .stat-val { color: #991b1b; }
 
         /* Items Table */
         .statement-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 13px;
+            font-size: 12.5px;
             margin-bottom: 24px;
         }
         .statement-table th {
             text-align: left;
-            padding: 10px 8px;
-            background: #0f172a;
-            color: #ffffff;
+            padding: 8px 6px;
+            border-top: 1.5px solid #000000;
+            border-bottom: 1.5px solid #000000;
+            color: #000000;
             font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
-            font-weight: 600;
+            letter-spacing: 0.5px;
+            font-weight: 800;
+            background: transparent;
         }
         .statement-table th.num, .statement-table td.num {
             text-align: right;
             font-variant-numeric: tabular-nums;
         }
         .statement-table td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #e2e8f0;
-            color: #334155;
-        }
-        .statement-table tr:hover td {
-            background-color: #f8fafc;
+            padding: 9px 6px;
+            border-bottom: 1px solid #e5e7eb;
+            color: #000000;
         }
         .inv-badge {
             font-family: 'JetBrains Mono', monospace;
             font-weight: 700;
-            color: #0f766e;
+            color: #000000;
             font-size: 12px;
+            text-decoration: underline;
         }
         .status-badge {
             display: inline-flex;
-            padding: 2px 7px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
+            padding: 1px 6px;
+            border: 1px solid #000000;
+            font-size: 10px;
+            font-weight: 800;
             text-transform: uppercase;
+            background: #ffffff;
+            color: #000000;
         }
-        .status-paid { background: #d1fae5; color: #065f46; }
-        .status-partial { background: #fef3c7; color: #92400e; }
-        .status-unpaid { background: #fee2e2; color: #991b1b; }
 
-        /* Totals Block */
+        /* Totals Block (Open Monochrome Aligned Block) */
         .totals-card {
             margin-left: auto;
-            max-width: 320px;
-            border-top: 2px solid #0f172a;
-            padding-top: 12px;
+            max-width: 300px;
+            border-top: 1.5px solid #000000;
+            padding-top: 8px;
             margin-bottom: 30px;
         }
         .totals-row {
             display: flex;
             justify-content: space-between;
-            font-size: 13px;
-            padding: 4px 0;
-            color: #475569;
+            font-size: 12.5px;
+            padding: 3px 0;
+            color: #1f2937;
         }
         .totals-row.grand {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 800;
-            color: #0f172a;
-            border-top: 1px dashed #cbd5e1;
-            padding-top: 8px;
+            color: #000000;
+            border-top: 1px solid #000000;
+            padding-top: 6px;
             margin-top: 4px;
-        }
-        .totals-row.grand.due {
-            color: #991b1b;
         }
 
         /* Signatures & Footer */
         .statement-footer {
-            border-top: 1px solid #e2e8f0;
-            padding-top: 24px;
+            border-top: 1.5px solid #000000;
+            padding-top: 32px;
             display: flex;
             justify-content: space-between;
-            align-items: flex-end;
-            margin-top: 20px;
+            align-items: flex-start;
+            margin-top: 24px;
         }
         .sign-box {
             text-align: center;
-            width: 180px;
+            width: 220px;
         }
         .sign-line {
-            border-top: 1px solid #94a3b8;
-            margin-bottom: 6px;
+            border-top: 1.5px solid #000000;
+            margin-bottom: 8px;
         }
         .sign-label {
             font-size: 11px;
-            color: #64748b;
+            color: #000000;
+            font-weight: 800;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            display: block;
+        }
+        .statement-bottom-note {
+            text-align: center;
+            font-size: 10px;
+            color: #4b5563;
+            margin-top: 16px;
+            width: 100%;
         }
 
         /* Print Media */
         @media print {
-            body { background: #fff; padding: 0; }
+            @page {
+                size: A4 portrait;
+                margin: 12mm 15mm 15mm 15mm;
+            }
+            body {
+                background: #ffffff !important;
+                padding: 0 !important;
+            }
             .toolbar { display: none !important; }
             .statement-card {
-                box-shadow: none;
-                border: none;
-                padding: 0;
-                max-width: 100%;
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
             }
+            a { text-decoration: none !important; color: #000000 !important; }
         }
     </style>
 </head>
@@ -316,7 +321,7 @@
     <div class="toolbar">
         <div class="toolbar-left">
             <a href="{% url 'sales:list' %}" class="btn btn-secondary">← Back to Sales</a>
-            <span style="font-size: 12px; color: #64748b; font-weight: 600; margin-left: 6px;">Filter Status:</span>
+            <span style="font-size: 12px; color: #4b5563; font-weight: 700; margin-left: 6px;">Filter:</span>
             <a href="?customer={{ customer_query }}&ids={{ selected_ids }}&status=all" class="btn btn-pill {% if status_filter == 'all' %}active{% endif %}">All ({{ items_count }})</a>
             <a href="?customer={{ customer_query }}&ids={{ selected_ids }}&status=paid" class="btn btn-pill {% if status_filter == 'paid' %}active{% endif %}">Paid Only</a>
             <a href="?customer={{ customer_query }}&ids={{ selected_ids }}&status=partial" class="btn btn-pill {% if status_filter == 'partial' %}active{% endif %}">Partial Only</a>
@@ -336,20 +341,20 @@
                 <h1 class="brand-title">MTRONIX</h1>
                 <p class="brand-sub">
                     Electronics, Hardware & Components<br>
-                    124 BCC Road, Dhaka, Bangladesh<br>
-                    Phone: 01706-970195 &bull; mannanelectronics111@gmail.com
+                    44/45, KaftanBazar Madina Electric & Electronics, (2nd floor), shop no-3,4. Wari, Dhaka.<br>
+                    Phone: 01744676770 &bull; mtronix1203@gmail.com
                 </p>
             </div>
-            <div style="display: flex; gap: 16px; align-items: center;">
+            <div style="display: flex; gap: 14px; align-items: center;">
                 <div class="doc-title-block">
                     <h2 class="doc-title">Account Statement</h2>
                     <p class="doc-date">Generated: {{ generated_at }}</p>
-                    <p class="doc-date" style="font-weight: 600; color: #0f766e; margin-top: 2px;">{{ filter_label }}</p>
+                    <p class="doc-date" style="font-weight: 700; color: #000000; margin-top: 2px;">{{ filter_label }}</p>
                 </div>
                 {% if qr_code_b64 %}
-                <div style="display: flex; flex-direction: column; align-items: center; padding: 4px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px;">
-                    <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR" style="width: 52px; height: 52px; display: block; image-rendering: pixelated;">
-                    <span style="font-size: 7.5px; font-weight: 700; color: #475569; margin-top: 2px; text-transform: uppercase;">Scan Location</span>
+                <div style="display: flex; flex-direction: column; align-items: center; padding: 4px; background: #ffffff; border: 1px solid #000000;">
+                    <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR" style="width: 48px; height: 48px; display: block; image-rendering: pixelated;">
+                    <span style="font-size: 7px; font-weight: 700; color: #000000; margin-top: 2px; text-transform: uppercase;">Location</span>
                 </div>
                 {% endif %}
             </div>
@@ -377,36 +382,20 @@
             </div>
         </div>
 
-        <!-- Summary Stats -->
-        <div class="stats-grid">
-            <div class="stat-box">
-                <div class="stat-label">Total Invoiced</div>
-                <div class="stat-val">BDT {{ total_billed|floatformat:2 }}</div>
-            </div>
-            <div class="stat-box highlight">
-                <div class="stat-label">Total Paid</div>
-                <div class="stat-val">BDT {{ total_paid|floatformat:2 }}</div>
-            </div>
-            <div class="stat-box due-box">
-                <div class="stat-label">Outstanding Due</div>
-                <div class="stat-val">BDT {{ total_due|floatformat:2 }}</div>
-            </div>
-        </div>
-
         <!-- Items Table -->
         <table class="statement-table">
             <thead>
                 <tr>
-                    <th>Date</th>
-                    <th>Invoice No</th>
+                    <th style="width: 90px;">Date</th>
+                    <th style="width: 95px;">Invoice No</th>
                     {% if is_multi_customer %}
-                    <th>Customer</th>
+                    <th style="width: 120px;">Customer</th>
                     {% endif %}
                     <th>Product Description</th>
-                    <th class="num">Qty</th>
-                    <th class="num">Unit Price</th>
-                    <th class="num">Total Amount</th>
-                    <th>Status</th>
+                    <th class="num" style="width: 50px;">Qty</th>
+                    <th class="num" style="width: 100px;">Unit Price</th>
+                    <th class="num" style="width: 110px;">Total Amount</th>
+                    <th style="width: 75px; text-align: center;">Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -416,30 +405,30 @@
                     <td><a href="{% url 'sales:receipt_print' it.sale_id %}" target="_blank" class="inv-badge">{{ it.sale_code }}</a></td>
                     {% if is_multi_customer %}
                     <td>
-                        <strong style="color: #0f172a;">{{ it.customer_name }}</strong>
-                        {% if it.customer_phone %}<span style="font-size: 11px; color: #64748b; display: block; font-family: 'JetBrains Mono', monospace;">📞 {{ it.customer_phone }}</span>{% endif %}
+                        <strong style="color: #000000;">{{ it.customer_name }}</strong>
+                        {% if it.customer_phone %}<span style="font-size: 11px; color: #4b5563; display: block; font-family: 'JetBrains Mono', monospace;">{{ it.customer_phone }}</span>{% endif %}
                     </td>
                     {% endif %}
                     <td>
                         <strong>{{ it.product_name }}</strong>
-                        {% if it.sku and it.sku != '—' %}<span style="font-size: 11px; color: #64748b; display: block;">SKU: {{ it.sku }}</span>{% endif %}
+                        {% if it.sku and it.sku != '—' %}<span style="font-size: 11px; color: #4b5563; display: block;">SKU: {{ it.sku }}</span>{% endif %}
                     </td>
                     <td class="num">{{ it.quantity }}</td>
                     <td class="num">BDT {{ it.unit_price|floatformat:2 }}</td>
                     <td class="num"><strong>BDT {{ it.total_amount|floatformat:2 }}</strong></td>
-                    <td>
+                    <td style="text-align: center;">
                         {% if it.is_paid %}
-                        <span class="status-badge status-paid">PAID</span>
+                        <span class="status-badge">PAID</span>
                         {% elif it.is_partial %}
-                        <span class="status-badge status-partial">PARTIAL</span>
+                        <span class="status-badge">PARTIAL</span>
                         {% else %}
-                        <span class="status-badge status-unpaid">UNPAID</span>
+                        <span class="status-badge">UNPAID</span>
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{% if is_multi_customer %}8{% else %}7{% endif %}" style="text-align: center; padding: 24px; color: #64748b;">
+                    <td colspan="{% if is_multi_customer %}8{% else %}7{% endif %}" style="text-align: center; padding: 24px; color: #4b5563;">
                         No transaction records found matching the criteria.
                     </td>
                 </tr>
@@ -455,9 +444,9 @@
             </div>
             <div class="totals-row">
                 <span>Amount Paid:</span>
-                <span style="color: #065f46; font-weight: 600;">BDT {{ total_paid|floatformat:2 }}</span>
+                <span>BDT {{ total_paid|floatformat:2 }}</span>
             </div>
-            <div class="totals-row grand {% if total_due > 0 %}due{% endif %}">
+            <div class="totals-row grand">
                 <span>Balance Due:</span>
                 <span>BDT {{ total_due|floatformat:2 }}</span>
             </div>
@@ -467,16 +456,16 @@
         <footer class="statement-footer">
             <div class="sign-box">
                 <div class="sign-line"></div>
-                <span class="sign-label">Customer Signature</span>
-            </div>
-            <div style="font-size: 11px; color: #64748b; text-align: center;">
-                Computer-generated statement &bull; Mtronix
+                <span class="sign-label">Manager Signature</span>
             </div>
             <div class="sign-box">
                 <div class="sign-line"></div>
-                <span class="sign-label">Authorized Signature</span>
+                <span class="sign-label">CEO Abdul Mannan Signature</span>
             </div>
         </footer>
+        <div class="statement-bottom-note">
+            Computer-generated statement &bull; Mtronix
+        </div>
     </div>
 
 </body>

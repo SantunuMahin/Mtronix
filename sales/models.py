@@ -126,5 +126,10 @@ class SaleItem(models.Model):
             return self.product.sku
         return ''
 
+    def save(self, *args, **kwargs):
+        if self.product and not self.custom_name:
+            self.custom_name = self.product.name
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f'{self.display_name} x {self.quantity} in Sale #{self.sale.pk}'
