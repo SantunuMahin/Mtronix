@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,10 +88,27 @@
             background: #ffffff;
             width: 100%;
             max-width: 800px;
-            padding: 36px 40px;
+            min-height: 1050px;
+            padding: 36px 40px 30px;
             border-radius: 4px;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
             border: 1px solid #000000;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .statement-body {
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .statement-bottom-pinned {
+            flex-shrink: 0;
+            margin-top: auto;
+            padding-top: 40px;
+            width: 100%;
         }
 
         /* Header */
@@ -195,7 +213,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 12.5px;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
         .statement-table th {
             text-align: left;
@@ -208,15 +226,19 @@
             letter-spacing: 0.5px;
             font-weight: 800;
             background: transparent;
+            white-space: nowrap;
         }
         .statement-table th.num, .statement-table td.num {
             text-align: right;
             font-variant-numeric: tabular-nums;
         }
         .statement-table td {
-            padding: 9px 6px;
-            border-bottom: 1px solid #e5e7eb;
+            padding: 8px 6px;
+            border-bottom: 1px dashed #d1d5db;
             color: #000000;
+        }
+        .statement-table tr:last-child td {
+            border-bottom: 1.5px solid #000000;
         }
         .inv-badge {
             font-family: 'JetBrains Mono', monospace;
@@ -234,40 +256,41 @@
             text-transform: uppercase;
             background: #ffffff;
             color: #000000;
+            white-space: nowrap;
         }
 
-        /* Totals Block (Open Monochrome Aligned Block) */
+        /* Totals Block (Directly Below Table, Right Aligned) */
         .totals-card {
             margin-left: auto;
-            max-width: 300px;
-            border-top: 1.5px solid #000000;
-            padding-top: 8px;
-            margin-bottom: 30px;
+            width: 270px;
+            margin-top: 6px;
+            margin-bottom: 20px;
         }
         .totals-row {
             display: flex;
             justify-content: space-between;
             font-size: 12.5px;
             padding: 3px 0;
-            color: #1f2937;
+            color: #000000;
         }
         .totals-row.grand {
-            font-size: 15px;
+            font-size: 14.5px;
             font-weight: 800;
             color: #000000;
-            border-top: 1px solid #000000;
-            padding-top: 6px;
+            border-top: 1.5px solid #000000;
+            border-bottom: 1.5px solid #000000;
+            padding: 6px 0;
             margin-top: 4px;
+            margin-bottom: 4px;
         }
 
         /* Signatures & Footer */
         .statement-footer {
-            border-top: 1.5px solid #000000;
-            padding-top: 32px;
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-top: 24px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+            gap: 24px;
         }
         .sign-box {
             text-align: center;
@@ -275,7 +298,7 @@
         }
         .sign-line {
             border-top: 1.5px solid #000000;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .sign-label {
             font-size: 11px;
@@ -286,23 +309,53 @@
             white-space: nowrap;
             display: block;
         }
-        .statement-bottom-note {
-            text-align: center;
+        .statement-bottom-wrap {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 10px;
+            border-top: 1px solid #000000;
+            width: 100%;
+            gap: 16px;
+        }
+        .statement-bottom-text {
             font-size: 10px;
             color: #4b5563;
-            margin-top: 16px;
-            width: 100%;
+            text-align: left;
+        }
+        .statement-qr-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border: 1px solid #000000;
+            padding: 3px 5px;
+            background: #ffffff;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .statement-qr-box img {
+            width: 44px;
+            height: 44px;
+            display: block;
+            image-rendering: pixelated;
+        }
+        .statement-qr-box span {
+            font-size: 7px;
+            font-weight: 700;
+            color: #000000;
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         /* Print Media */
         @media print {
-            @page {
-                size: A4 portrait;
-                margin: 12mm 15mm 15mm 15mm;
-            }
-            body {
+            html, body {
+                height: 100% !important;
                 background: #ffffff !important;
                 padding: 0 !important;
+                color: #000000 !important;
             }
             .toolbar { display: none !important; }
             .statement-card {
@@ -310,8 +363,26 @@
                 border: none !important;
                 padding: 0 !important;
                 max-width: 100% !important;
+                width: 100% !important;
+                min-height: calc(100vh - 24mm) !important;
+                height: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+            }
+            .statement-body {
+                flex: 1 0 auto !important;
+            }
+            .statement-bottom-pinned {
+                margin-top: auto !important;
+                padding-top: 20px !important;
+                page-break-inside: avoid !important;
             }
             a { text-decoration: none !important; color: #000000 !important; }
+            @page {
+                size: A4 portrait;
+                margin: 12mm 15mm 12mm 15mm;
+            }
         }
     </style>
 </head>
@@ -335,136 +406,147 @@
 
     <!-- Statement Card -->
     <div class="statement-card">
-        <!-- Header -->
-        <header class="statement-header">
-            <div>
-                <h1 class="brand-title">MTRONIX</h1>
-                <p class="brand-sub">
-                    Electronics, Hardware & Components<br>
-                    44/45, KaftanBazar Madina Electric & Electronics, (2nd floor), shop no-3,4. Wari, Dhaka.<br>
-                    Phone: 01744676770 &bull; mtronix1203@gmail.com
-                </p>
+        <div class="statement-body">
+            <!-- Header -->
+            <header class="statement-header">
+                <div>
+                    <h1 class="brand-title">MTRONIX</h1>
+                    <p class="brand-sub">
+                        Electronics, Hardware & Components<br>
+                        44/45, Madina Electric & Electronics, (2nd floor), shop no. 3, 4. Kaptan Bazar, Dhaka.<br>
+                        Phone: 01744676770 &bull; mtronix1203@gmail.com
+                    </p>
+                </div>
+                <div style="display: flex; gap: 14px; align-items: center;">
+                    <div class="doc-title-block">
+                        <h2 class="doc-title">Account Statement</h2>
+                        <p class="doc-date">Generated: {{ generated_at }}</p>
+                        <p class="doc-date" style="font-weight: 700; color: #000000; margin-top: 2px;">{{ filter_label }}</p>
+                    </div>
+                    <div>
+                        <img src="{% static 'img/logo.png' %}" alt="Mtronix Logo" style="width: 68px; height: 68px; object-fit: contain; display: block;">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Customer & Statement Meta -->
+            <div class="info-grid">
+                <div class="info-col">
+                    {% if is_multi_customer %}
+                    <h3>Statement Type</h3>
+                    <div class="info-name">Consolidated Customer Ledger</div>
+                    <div class="info-detail">Combined transaction history across <strong>{{ distinct_customer_count }}</strong> customer accounts / walk-in sales</div>
+                    {% else %}
+                    <h3>Customer Information</h3>
+                    <div class="info-name">{{ customer_name }}</div>
+                    {% if customer_phone %}<div class="info-detail"><strong>Phone:</strong> {{ customer_phone }}</div>{% endif %}
+                    {% if customer_address %}<div class="info-detail"><strong>Address:</strong> {{ customer_address }}</div>{% endif %}
+                    {% endif %}
+                </div>
+                <div class="info-col">
+                    <h3>Statement Summary</h3>
+                    <div class="info-detail"><strong>Total Invoices:</strong> {{ sales_count }}</div>
+                    <div class="info-detail"><strong>Total Items:</strong> {{ items_count }}</div>
+                    <div class="info-detail"><strong>Status Filter:</strong> {{ filter_label }}</div>
+                </div>
             </div>
-            <div style="display: flex; gap: 14px; align-items: center;">
-                <div class="doc-title-block">
-                    <h2 class="doc-title">Account Statement</h2>
-                    <p class="doc-date">Generated: {{ generated_at }}</p>
-                    <p class="doc-date" style="font-weight: 700; color: #000000; margin-top: 2px;">{{ filter_label }}</p>
+
+            <!-- Items Table -->
+            <table class="statement-table">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">Date</th>
+                        <th style="width: 90px;">Invoice No</th>
+                        {% if is_multi_customer %}
+                        <th style="width: 120px;">Customer</th>
+                        {% endif %}
+                        <th>Product Description</th>
+                        <th class="num" style="width: 45px;">Qty</th>
+                        <th class="num" style="width: 95px;">Unit Price</th>
+                        <th class="num" style="width: 105px;">Total Amount</th>
+                        <th style="width: 75px; text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for it in items %}
+                    <tr>
+                        <td>{{ it.date }}</td>
+                        <td><a href="{% url 'sales:receipt_print' it.sale_id %}" target="_blank" class="inv-badge">{{ it.sale_code }}</a></td>
+                        {% if is_multi_customer %}
+                        <td>
+                            <strong style="color: #000000;">{{ it.customer_name }}</strong>
+                            {% if it.customer_phone %}<span style="font-size: 11px; color: #4b5563; display: block; font-family: 'JetBrains Mono', monospace;">{{ it.customer_phone }}</span>{% endif %}
+                        </td>
+                        {% endif %}
+                        <td>
+                            <strong>{{ it.product_name }}</strong>
+                            {% if it.sku and it.sku != '—' %}<span style="font-size: 11px; color: #4b5563; display: block;">SKU: {{ it.sku }}</span>{% endif %}
+                        </td>
+                        <td class="num">{{ it.quantity }}</td>
+                        <td class="num">BDT {{ it.unit_price|floatformat:2 }}</td>
+                        <td class="num"><strong>BDT {{ it.total_amount|floatformat:2 }}</strong></td>
+                        <td style="text-align: center;">
+                            {% if it.is_paid %}
+                            <span class="status-badge">PAID</span>
+                            {% elif it.is_partial %}
+                            <span class="status-badge">PARTIAL</span>
+                            {% else %}
+                            <span class="status-badge">UNPAID</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if is_multi_customer %}8{% else %}7{% endif %}" style="text-align: center; padding: 24px; color: #4b5563;">
+                            No transaction records found matching the criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Totals breakdown -->
+            <div class="totals-card">
+                <div class="totals-row">
+                    <span>Total Invoiced:</span>
+                    <span>BDT {{ total_billed|floatformat:2 }}</span>
+                </div>
+                <div class="totals-row">
+                    <span>Amount Paid:</span>
+                    <span>BDT {{ total_paid|floatformat:2 }}</span>
+                </div>
+                <div class="totals-row grand">
+                    <span>Balance Due:</span>
+                    <span>BDT {{ total_due|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Absolute Bottom Pinned Container (Signatures & Footer) -->
+        <div class="statement-bottom-pinned">
+            <footer class="statement-footer">
+                <div class="sign-box">
+                    <div class="sign-line"></div>
+                    <span class="sign-label">Manager Signature</span>
+                </div>
+                <div class="sign-box">
+                    <div class="sign-line"></div>
+                    <span class="sign-label">CEO Abdul Mannan Signature</span>
+                </div>
+            </footer>
+            <!-- Footer with QR at Most Bottom-Right Position -->
+            <div class="statement-bottom-wrap">
+                <div class="statement-bottom-text">
+                    <p style="font-weight: 700; color: #000000;">Statement generated &bull; Mtronix</p>
+                    <p style="font-size: 9.5px; color: #6b7280; margin-top: 2px;">Software by Intlisoft Innovation (01888-735883)</p>
                 </div>
                 {% if qr_code_b64 %}
-                <div style="display: flex; flex-direction: column; align-items: center; padding: 4px; background: #ffffff; border: 1px solid #000000;">
-                    <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR" style="width: 48px; height: 48px; display: block; image-rendering: pixelated;">
-                    <span style="font-size: 7px; font-weight: 700; color: #000000; margin-top: 2px; text-transform: uppercase;">Location</span>
+                <div class="statement-qr-box">
+                    <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR">
+                    <span>Location QR</span>
                 </div>
                 {% endif %}
             </div>
-        </header>
-
-        <!-- Customer & Statement Meta -->
-        <div class="info-grid">
-            <div class="info-col">
-                {% if is_multi_customer %}
-                <h3>Statement Type</h3>
-                <div class="info-name">Consolidated Customer Ledger</div>
-                <div class="info-detail">Combined transaction history across <strong>{{ distinct_customer_count }}</strong> customer accounts / walk-in sales</div>
-                {% else %}
-                <h3>Customer Information</h3>
-                <div class="info-name">{{ customer_name }}</div>
-                {% if customer_phone %}<div class="info-detail"><strong>Phone:</strong> {{ customer_phone }}</div>{% endif %}
-                {% if customer_address %}<div class="info-detail"><strong>Address:</strong> {{ customer_address }}</div>{% endif %}
-                {% endif %}
-            </div>
-            <div class="info-col">
-                <h3>Statement Summary</h3>
-                <div class="info-detail"><strong>Total Invoices:</strong> {{ sales_count }}</div>
-                <div class="info-detail"><strong>Total Items:</strong> {{ items_count }}</div>
-                <div class="info-detail"><strong>Status Filter:</strong> {{ filter_label }}</div>
-            </div>
-        </div>
-
-        <!-- Items Table -->
-        <table class="statement-table">
-            <thead>
-                <tr>
-                    <th style="width: 90px;">Date</th>
-                    <th style="width: 95px;">Invoice No</th>
-                    {% if is_multi_customer %}
-                    <th style="width: 120px;">Customer</th>
-                    {% endif %}
-                    <th>Product Description</th>
-                    <th class="num" style="width: 50px;">Qty</th>
-                    <th class="num" style="width: 100px;">Unit Price</th>
-                    <th class="num" style="width: 110px;">Total Amount</th>
-                    <th style="width: 75px; text-align: center;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for it in items %}
-                <tr>
-                    <td>{{ it.date }}</td>
-                    <td><a href="{% url 'sales:receipt_print' it.sale_id %}" target="_blank" class="inv-badge">{{ it.sale_code }}</a></td>
-                    {% if is_multi_customer %}
-                    <td>
-                        <strong style="color: #000000;">{{ it.customer_name }}</strong>
-                        {% if it.customer_phone %}<span style="font-size: 11px; color: #4b5563; display: block; font-family: 'JetBrains Mono', monospace;">{{ it.customer_phone }}</span>{% endif %}
-                    </td>
-                    {% endif %}
-                    <td>
-                        <strong>{{ it.product_name }}</strong>
-                        {% if it.sku and it.sku != '—' %}<span style="font-size: 11px; color: #4b5563; display: block;">SKU: {{ it.sku }}</span>{% endif %}
-                    </td>
-                    <td class="num">{{ it.quantity }}</td>
-                    <td class="num">BDT {{ it.unit_price|floatformat:2 }}</td>
-                    <td class="num"><strong>BDT {{ it.total_amount|floatformat:2 }}</strong></td>
-                    <td style="text-align: center;">
-                        {% if it.is_paid %}
-                        <span class="status-badge">PAID</span>
-                        {% elif it.is_partial %}
-                        <span class="status-badge">PARTIAL</span>
-                        {% else %}
-                        <span class="status-badge">UNPAID</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="{% if is_multi_customer %}8{% else %}7{% endif %}" style="text-align: center; padding: 24px; color: #4b5563;">
-                        No transaction records found matching the criteria.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <!-- Totals breakdown -->
-        <div class="totals-card">
-            <div class="totals-row">
-                <span>Total Invoiced:</span>
-                <span>BDT {{ total_billed|floatformat:2 }}</span>
-            </div>
-            <div class="totals-row">
-                <span>Amount Paid:</span>
-                <span>BDT {{ total_paid|floatformat:2 }}</span>
-            </div>
-            <div class="totals-row grand">
-                <span>Balance Due:</span>
-                <span>BDT {{ total_due|floatformat:2 }}</span>
-            </div>
-        </div>
-
-        <!-- Signatures / Footer -->
-        <footer class="statement-footer">
-            <div class="sign-box">
-                <div class="sign-line"></div>
-                <span class="sign-label">Manager Signature</span>
-            </div>
-            <div class="sign-box">
-                <div class="sign-line"></div>
-                <span class="sign-label">CEO Abdul Mannan Signature</span>
-            </div>
-        </footer>
-        <div class="statement-bottom-note">
-            Computer-generated statement &bull; Mtronix
         </div>
     </div>
 

@@ -24,6 +24,7 @@ from sales.pdf import (
     _bd_time,
     _build_qr_matrix,
     _divider,
+    _get_logo_image_data,
     _line,
     _make_footer_ops,
     _qr_pdf_stream,
@@ -42,10 +43,9 @@ def _render_inventory_header_top(
     doc_title: str,
     period_label: str,
     generated: str,
-    qr_matrix: List[List[bool]],
-    qr_cell: float = 1.05,
+    logo_data: tuple[int, int, bytes] | None = None,
 ) -> List[str]:
-    """Render the standard top brand banner for inventory reports."""
+    """Render the standard top brand banner for inventory reports with official logo."""
     ops: List[str] = [
         _text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.0, g=0.0, b=0.0),
         _text_line(748, doc_title.upper(), 8.5, 54, bold=True, r=0.2, g=0.2, b=0.2),
@@ -53,39 +53,28 @@ def _render_inventory_header_top(
         _text_line(723, f'Address: {MTRONIX_ADDRESS}', 8, 54, r=0.25, g=0.25, b=0.25),
     ]
 
-    if qr_matrix:
-        qr_size = len(qr_matrix) * qr_cell
-        card_w = qr_size + 14
-        card_h = qr_size + 20
-        card_x = 558 - card_w
-        card_y = 712
-        qr_x = card_x + 7
-        qr_y = card_y + 4
-        ops.append(_rect_card(card_x, card_y, card_w, card_h, bg=(1.0, 1.0, 1.0), border=(0.0, 0.0, 0.0)))
-        ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.0, g=0.0, b=0.0))
-        ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y, qr_cell))
+    if logo_data:
+        ops.append('q 88 0 0 66 470 705 cm /Im1 Do Q')
 
     ops.append(_line(54, 710, 558, 710, r=0.0, g=0.0, b=0.0, width=1.5))
     return ops
 
 
 def _append_statement_signatures(pc: PageComposer) -> None:
-    pc.ensure(60)
-    pc.skip(16)
-    y = pc.y
-    pc._streams.append(_line(54, y, 180, y, 0.0, 0.0, 0.0, 1.0))
+    if pc.y < 100:
+        pc.ensure(70)
+    y = 75
+    pc._streams.append(_line(54, y, 200, y, 0.0, 0.0, 0.0, 1.0))
     pc._streams.append(_text_line(y - 10, "Manager Signature", 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
 
-    pc._streams.append(_line(400, y, 558, y, 0.0, 0.0, 0.0, 1.0))
-    pc._streams.append(_text_line(y - 10, "CEO Abdul Mannan Signature", 8, 400, bold=True, r=0.0, g=0.0, b=0.0))
-    pc.skip(24)
+    pc._streams.append(_line(390, y, 558, y, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(y - 10, "CEO Abdul Mannan Signature", 8, 390, bold=True, r=0.0, g=0.0, b=0.0))
 
 
 # ── 1. Current Stock Summary PDF ─────────────────────────────────────────────
 def build_inventory_stock_pdf(report_data: dict[str, Any]) -> bytes:
     """Generate multi-page PDF for complete current stock inventory with pure black and white styling."""
-    qr_matrix = _build_qr_matrix(MAPS_URL)
-    qr_cell = 1.05
+    logo_data = _get_logo_image_data()
 
     raw_dt = report_data.get('generated_at')
     generated = raw_dt if isinstance(raw_dt, str) and raw_dt else _bd_now()
@@ -98,8 +87,7 @@ def build_inventory_stock_pdf(report_data: dict[str, Any]) -> bytes:
                 'Complete Inventory Stock Report',
                 period_label,
                 generated,
-                qr_matrix,
-                qr_cell,
+                logo_data,
             ))
 
             curr_y = 690
@@ -128,7 +116,7 @@ def build_inventory_stock_pdf(report_data: dict[str, Any]) -> bytes:
     def footer(page_no: int, is_last: bool) -> List[str]:
         return _make_footer_ops(page_no, is_last)
 
-    builder = PdfBuilder(auto_print=True)
+    builder = PdfBuilder(auto_print=True, image_data=logo_data)
     pc = PageComposer(builder, header_fn=header, footer_fn=footer, page_top=672.0)
 
     items = report_data.get('items', [])
@@ -168,8 +156,7 @@ def build_inventory_stock_pdf(report_data: dict[str, Any]) -> bytes:
 # ── 2. Today's / New Added Products PDF ──────────────────────────────────────
 def build_new_products_pdf(report_data: dict[str, Any]) -> bytes:
     """Generate multi-page PDF for newly added catalog products in pure black & white."""
-    qr_matrix = _build_qr_matrix(MAPS_URL)
-    qr_cell = 1.05
+    logo_data = _get_logo_image_data()
 
     raw_dt = report_data.get('generated_at')
     generated = raw_dt if isinstance(raw_dt, str) and raw_dt else _bd_now()
@@ -182,8 +169,7 @@ def build_new_products_pdf(report_data: dict[str, Any]) -> bytes:
                 'New Added Products Catalog Report',
                 period_label,
                 generated,
-                qr_matrix,
-                qr_cell,
+                logo_data,
             ))
 
             curr_y = 690
@@ -211,7 +197,7 @@ def build_new_products_pdf(report_data: dict[str, Any]) -> bytes:
     def footer(page_no: int, is_last: bool) -> List[str]:
         return _make_footer_ops(page_no, is_last)
 
-    builder = PdfBuilder(auto_print=True)
+    builder = PdfBuilder(auto_print=True, image_data=logo_data)
     pc = PageComposer(builder, header_fn=header, footer_fn=footer, page_top=672.0)
 
     products = report_data.get('products', [])
@@ -245,8 +231,7 @@ def build_new_products_pdf(report_data: dict[str, Any]) -> bytes:
 # ── 3. Stock / Quantity Updates PDF ──────────────────────────────────────────
 def build_stock_updates_pdf(report_data: dict[str, Any]) -> bytes:
     """Generate multi-page PDF for updated inventory stock and quantity changes in pure black & white."""
-    qr_matrix = _build_qr_matrix(MAPS_URL)
-    qr_cell = 1.05
+    logo_data = _get_logo_image_data()
 
     raw_dt = report_data.get('generated_at')
     generated = raw_dt if isinstance(raw_dt, str) and raw_dt else _bd_now()
@@ -259,8 +244,7 @@ def build_stock_updates_pdf(report_data: dict[str, Any]) -> bytes:
                 'Stock & Quantity Updates Audit Report',
                 period_label,
                 generated,
-                qr_matrix,
-                qr_cell,
+                logo_data,
             ))
 
             curr_y = 690
@@ -290,7 +274,7 @@ def build_stock_updates_pdf(report_data: dict[str, Any]) -> bytes:
     def footer(page_no: int, is_last: bool) -> List[str]:
         return _make_footer_ops(page_no, is_last)
 
-    builder = PdfBuilder(auto_print=True)
+    builder = PdfBuilder(auto_print=True, image_data=logo_data)
     pc = PageComposer(builder, header_fn=header, footer_fn=footer, page_top=672.0)
 
     items = report_data.get('items', [])

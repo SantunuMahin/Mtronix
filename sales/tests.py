@@ -458,23 +458,23 @@ class SalePageTests(TestCase):
             items=[{'product': self.product, 'quantity': 2, 'unit_price': '10.00'}], # Total 20, Due 0
         )
 
-        # S1 (first order) receipt should NOT have previous purchases
+        # S1 (first order) receipt should have signatures at bottom
         res_s1 = self.client.get(f'/sales/{s1.pk}/receipt/')
         self.assertEqual(res_s1.status_code, 200)
-        self.assertNotContains(res_s1, 'Previous Purchases')
+        self.assertContains(res_s1, "Customer's Signature")
+        self.assertContains(res_s1, "Authorized Signature")
 
-        # S2 (new second order) receipt SHOULD contain previous purchases details and net due balance
+        # S2 (new second order) receipt should contain returning customer badge and signature options
         res_s2 = self.client.get(f'/sales/{s2.pk}/receipt/')
         self.assertEqual(res_s2.status_code, 200)
-        self.assertContains(res_s2, 'Previous Purchases (1 order)')
-        self.assertContains(res_s2, 'Previous Unpaid Due:')
-        self.assertContains(res_s2, 'NET TOTAL OUTSTANDING DUE:')
-        self.assertContains(res_s2, '50.00')
+        self.assertContains(res_s2, 'Returning Customer (Order #2)')
+        self.assertContains(res_s2, "Customer's Signature")
+        self.assertContains(res_s2, "Authorized Signature")
 
-        # S2 PDF receipt should also render successfully with previous buy details
+        # S2 PDF receipt should also render successfully with signatures
         res_pdf = self.client.get(f'/sales/{s2.pk}/receipt.pdf')
         self.assertEqual(res_pdf.status_code, 200)
-        self.assertTrue(len(res_pdf.content) > 0)
+        self.assertTrue(len(res_pdf.content) > 1000)
 
     def test_sale_item_preserves_product_name_on_save(self):
         prod = Product.objects.create(

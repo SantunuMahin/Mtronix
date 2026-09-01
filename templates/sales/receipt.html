@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -8,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap"
         rel="stylesheet">
     <style>
         * {
@@ -72,13 +73,13 @@
             background-color: #f3f4f6;
         }
 
-        /* ── Standard A4 Monochrome Invoice Sheet ──────────── */
+        /* ── Standard A4 Monochrome Invoice Sheet ────────────────── */
         .invoice-sheet {
             background: #ffffff;
             width: 100%;
             max-width: 820px;
             min-height: 1050px;
-            padding: 40px 44px;
+            padding: 44px 48px 36px;
             border-radius: 4px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
             border: 1px solid #d1d5db;
@@ -87,143 +88,85 @@
             justify-content: space-between;
         }
 
-        /* ── Header ────────────────────────────────────────── */
-        .invoice-header {
+        .invoice-body-content {
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .invoice-bottom-pinned {
+            flex-shrink: 0;
+            margin-top: auto;
+            padding-top: 40px;
+            width: 100%;
+        }
+
+        /* ── Top Header (Company Left, Logo Right) ──────────── */
+        .top-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 20px;
-            padding-bottom: 16px;
-            border-bottom: 2px solid #000000;
-            margin-bottom: 18px;
+            gap: 24px;
+            margin-bottom: 24px;
         }
 
-        .brand-info h1 {
-            font-size: 28px;
-            font-weight: 800;
-            letter-spacing: 2px;
+        .company-info h1 {
+            font-size: 22px;
+            font-weight: 900;
             color: #000000;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
             text-transform: uppercase;
-            line-height: 1.1;
         }
 
-        .brand-subtitle {
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 1.2px;
-            color: #333333;
-            text-transform: uppercase;
-            margin: 4px 0 6px;
-            display: block;
-        }
-
-        .brand-meta {
+        .company-info p {
             font-size: 12px;
             color: #333333;
             line-height: 1.45;
         }
 
-        .brand-meta strong {
-            color: #000000;
-        }
-
-        .header-right {
+        .logo-box {
             display: flex;
-            align-items: flex-start;
-            gap: 16px;
-            text-align: right;
-        }
-
-        .invoice-title-block h2 {
-            font-size: 24px;
-            font-weight: 800;
-            letter-spacing: 1px;
-            color: #000000;
-            text-transform: uppercase;
-        }
-
-        .invoice-num {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            font-weight: 700;
-            color: #000000;
-            margin-top: 2px;
-        }
-
-        .invoice-date {
-            font-size: 12px;
-            color: #4b5563;
-            margin-top: 2px;
-        }
-
-        .payment-badge {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.75px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            margin-top: 6px;
-            border: 1.5px solid #000000;
-            color: #000000;
-            background-color: #ffffff;
-        }
-
-        .qr-box {
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            text-align: center;
-            border: 1px solid #000000;
-            padding: 4px 6px;
-            border-radius: 4px;
-            background: #ffffff;
+            justify-content: flex-end;
+            max-width: 140px;
         }
 
-        .qr-box img {
-            width: 58px;
-            height: 58px;
+        .logo-box img {
+            width: 110px;
+            height: auto;
+            max-height: 80px;
+            object-fit: contain;
             display: block;
-            image-rendering: pixelated;
         }
 
-        .qr-box span {
-            font-size: 8px;
-            font-weight: 700;
-            color: #000000;
-            margin-top: 2px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* ── Customer / Meta 2-Column Section ──────────────── */
+        /* ── Meta Section (Bill To Left, SALES INVOICE Right) ── */
         .meta-section {
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
             gap: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px dashed #000000;
-            margin-bottom: 18px;
+            margin-bottom: 24px;
         }
 
-        .meta-col {
+        .bill-to-col {
             flex: 1;
         }
 
-        .meta-label {
+        .bill-to-label {
             font-size: 11px;
             font-weight: 800;
             color: #000000;
             text-transform: uppercase;
-            letter-spacing: 0.75px;
+            letter-spacing: 0.5px;
             margin-bottom: 4px;
         }
 
-        .cust-name {
+        .customer-name {
             font-size: 15px;
             font-weight: 700;
             color: #000000;
+            margin-bottom: 2px;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -239,27 +182,70 @@
             border-radius: 4px;
         }
 
-        .cust-details {
-            font-size: 12.5px;
+        .customer-details {
+            font-size: 12px;
             color: #333333;
-            margin-top: 3px;
-            line-height: 1.4;
+            line-height: 1.45;
         }
 
-        .cust-details strong {
+        .invoice-title-col {
+            text-align: right;
+        }
+
+        .invoice-main-title {
+            font-size: 26px;
+            font-weight: 900;
             color: #000000;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            line-height: 1;
+        }
+
+        .meta-table {
+            margin-left: auto;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .meta-table td {
+            padding: 2px 0 2px 14px;
+            color: #000000;
+        }
+
+        .meta-table td.lbl {
+            font-weight: 800;
+            text-align: left;
+        }
+
+        .meta-table td.val {
+            font-weight: 600;
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .payment-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            padding: 1px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            border: 1px solid #000000;
+            color: #000000;
+            background-color: #ffffff;
         }
 
         /* ── Line Items Table ──────────────────────────────── */
         .items-table-wrap {
-            flex: 1;
-            margin-bottom: 18px;
+            margin-bottom: 12px;
         }
 
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 13px;
+            font-size: 12.5px;
             color: #000000;
         }
 
@@ -283,9 +269,16 @@
 
         .items-table td {
             padding: 9px 6px;
-            border-bottom: 1px dashed #d1d5db;
             vertical-align: top;
             color: #000000;
+        }
+
+        .items-table tr.item-row {
+            border-bottom: 1px dashed #d1d5db;
+        }
+
+        .items-table tr.item-row:last-child {
+            border-bottom: 1.5px solid #000000;
         }
 
         .item-title {
@@ -296,59 +289,21 @@
         }
 
         .item-sub {
-            font-size: 11px;
+            font-size: 10.5px;
             color: #4b5563;
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
-        /* ── Financial Summary & Signatures ────────────────── */
-        .bottom-section {
+        /* ── Financial Summary (Directly Below Table, Right Aligned) ── */
+        .totals-section {
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 32px;
-            border-top: 1.5px solid #000000;
-            padding-top: 16px;
-            margin-bottom: 24px;
-        }
-
-        .terms-block {
-            flex: 1.1;
-            font-size: 11.5px;
-            color: #333333;
-            line-height: 1.5;
-        }
-
-        .terms-block h4 {
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #000000;
-            margin-bottom: 4px;
-        }
-
-        .signatures-grid {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 48px;
-            padding-right: 20px;
-        }
-
-        .sign-box {
-            text-align: center;
-            border-top: 1.5px solid #000000;
-            padding-top: 6px;
-            width: 140px;
-            font-size: 11px;
-            font-weight: 700;
-            color: #000000;
+            justify-content: flex-end;
+            margin-top: 6px;
+            margin-bottom: 16px;
         }
 
         .totals-block {
-            flex: 0.9;
-            max-width: 320px;
-            width: 100%;
+            width: 270px;
         }
 
         .tot-row {
@@ -357,59 +312,106 @@
             align-items: center;
             font-size: 13px;
             color: #000000;
-            padding: 4px 0;
+            padding: 3px 0;
         }
 
         .tot-row.grand-total {
-            font-size: 15px;
+            font-size: 14.5px;
             font-weight: 800;
             color: #000000;
+            border-top: 1.5px solid #000000;
             border-bottom: 1.5px solid #000000;
-            padding-bottom: 6px;
+            padding: 6px 0;
+            margin-top: 4px;
             margin-bottom: 4px;
-        }
-
-        .tot-row.grand-total .amount {
-            color: #000000;
-            font-size: 16px;
-        }
-
-        .tot-row.paid {
-            font-weight: 600;
-            color: #000000;
         }
 
         .tot-row.due {
             font-weight: 800;
             color: #000000;
-            font-size: 14px;
-            border-top: 1.5px solid #000000;
-            margin-top: 4px;
-            padding-top: 4px;
+            font-size: 13px;
         }
 
-        /* Returning Customer Details (Black and White) */
-        .prev-orders-box {
-            border-top: 1px dashed #000000;
-            padding-top: 8px;
-            margin-top: 8px;
-            font-size: 12px;
-            color: #000000;
+        /* ── Full Width Signature Options at Absolute Bottom of Invoice ── */
+        .signatures-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 24px;
+            gap: 24px;
         }
 
-        /* ── Footer ────────────────────────────────────────── */
-        .invoice-footer {
+        .sign-block {
+            flex: 1;
+            max-width: 220px;
             text-align: center;
-            padding-top: 12px;
+        }
+
+        .sign-line {
+            border-top: 1.5px solid #000000;
+            margin-bottom: 6px;
+            width: 100%;
+        }
+
+        .sign-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #000000;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+        }
+
+        /* ── Footer with Most Bottom-Right QR Code ─────────── */
+        .invoice-footer-wrap {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 10px;
             border-top: 1px solid #000000;
+            gap: 16px;
+        }
+
+        .footer-left-text {
             font-size: 11px;
             color: #4b5563;
             line-height: 1.4;
+            text-align: left;
+        }
+
+        .footer-qr-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border: 1px solid #000000;
+            padding: 3px 5px;
+            background: #ffffff;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .footer-qr-box img {
+            width: 44px;
+            height: 44px;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .footer-qr-box span {
+            font-size: 7px;
+            font-weight: 700;
+            color: #000000;
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         /* ── Print Optimization for Canon LBP 6030 (A4 Laser) ── */
         @media print {
+            html,
             body {
+                height: 100% !important;
                 background: #ffffff !important;
                 padding: 0 !important;
                 color: #000000 !important;
@@ -422,29 +424,36 @@
             .invoice-sheet {
                 max-width: 100% !important;
                 width: 100% !important;
-                min-height: auto !important;
+                min-height: calc(100vh - 24mm) !important;
+                height: 100% !important;
                 box-shadow: none !important;
                 border: none !important;
                 padding: 0 !important;
                 border-radius: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+            }
+
+            .invoice-body-content {
+                flex: 1 0 auto !important;
+            }
+
+            .invoice-bottom-pinned {
+                margin-top: auto !important;
+                padding-top: 20px !important;
+                page-break-inside: avoid !important;
             }
 
             .items-table th,
             .items-table td,
-            .invoice-header,
-            .bottom-section,
-            .meta-section {
+            .bottom-section {
                 border-color: #000000 !important;
-            }
-
-            .tot-row.grand-total .amount,
-            .invoice-num {
-                color: #000000 !important;
             }
 
             @page {
                 size: A4 portrait;
-                margin: 12mm 15mm 15mm 15mm;
+                margin: 12mm 15mm 12mm 15mm;
             }
         }
     </style>
@@ -455,75 +464,69 @@
     <div class="toolbar">
         <a href="{% url 'sales:list' %}" class="btn btn-secondary">&larr; Back to Sales</a>
         <div style="display: flex; gap: 8px;">
-            <a href="{% url 'sales:receipt_pdf' sale.pk %}" class="btn btn-secondary" target="_blank">📄 Download
-                PDF</a>
+            <a href="{% url 'sales:receipt_pdf' sale.pk %}" class="btn btn-secondary" target="_blank">📄 Download PDF</a>
             <button onclick="window.print()" class="btn btn-primary">🖨️ Print Invoice (A4)</button>
         </div>
     </div>
 
     <!-- Standard A4 Invoice Sheet (Black & White) -->
     <div class="invoice-sheet">
-        <div>
-            <!-- Header -->
-            <div class="invoice-header">
-                <div class="brand-info">
+        <div class="invoice-body-content">
+            <!-- Top Header: Company info left, Logo right -->
+            <div class="top-header">
+                <div class="company-info">
                     <h1>MTRONIX</h1>
-                    <span class="brand-subtitle">Electronics, Hardware & Components</span>
-                    <div class="brand-meta">
-                        <p>44/45, KaftanBazar Madina Electric & Electronics, (2nd floor), shop no-3,4. Wari, Dhaka.</p>
-                        <p><strong>Phone:</strong> 01744676770 &bull; <strong>Email:</strong> mtronix1203@gmail.com</p>
-                    </div>
+                    <p>44/45, Madina Electric & Electronics, (2nd floor), shop no. 3, 4. Kaptan Bazar, Dhaka.</p>
+                    <p>Phone: 01744676770 &bull; Email: mtronix1203@gmail.com</p>
                 </div>
-                <div class="header-right">
-                    <div class="invoice-title-block">
-                        <h2>SALES INVOICE</h2>
-                        <div class="invoice-num">SALE-{{ sale.pk|stringformat:"05d" }}</div>
-                        <div class="invoice-date">Date: {{ sale.sold_at|date:"d M Y, h:i A" }}</div>
-                        <div>
-                            {% if sale.is_paid %}
-                            <span class="payment-badge">PAID</span>
-                            {% elif sale.is_partial %}
-                            <span class="payment-badge">PARTIAL PAYMENT</span>
-                            {% else %}
-                            <span class="payment-badge">UNPAID / DUE</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% if qr_code_b64 %}
-                    <div class="qr-box">
-                        <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store QR">
-                        <span>Store Location</span>
-                    </div>
-                    {% endif %}
+                <div class="logo-box">
+                    <img src="{% static 'img/logo.png' %}" alt="Mtronix Logo">
                 </div>
             </div>
 
-            <!-- Customer & Invoice Meta -->
+            <!-- Meta Section: Bill To on Left, SALES INVOICE details on Right -->
             <div class="meta-section">
-                <div class="meta-col">
-                    <div class="meta-label">Billed To</div>
-                    <div class="cust-name">
+                <div class="bill-to-col">
+                    <div class="bill-to-label">Bill To</div>
+                    <div class="customer-name">
                         <span>{{ sale.customer_name|default:"Walk-in Customer" }}</span>
                         {% if prev_history and prev_history.has_previous_orders %}
                         <span class="cust-tag">Returning Customer (Order #{{ prev_history.previous_orders_count|add:1 }})</span>
                         {% endif %}
                     </div>
-                    <div class="cust-details">
-                        {% if sale.customer_phone %}
-                        <p><strong>Phone:</strong> {{ sale.customer_phone }}</p>
-                        {% endif %}
+                    <div class="customer-details">
                         {% if sale.customer_address %}
-                        <p><strong>Address:</strong> {{ sale.customer_address }}</p>
+                        <p>{{ sale.customer_address }}</p>
+                        {% endif %}
+                        {% if sale.customer_phone %}
+                        <p>Phone: {{ sale.customer_phone }}</p>
                         {% endif %}
                     </div>
                 </div>
-                <div class="meta-col" style="text-align: right;">
-                    <div class="meta-label">Invoice Details</div>
-                    <div class="cust-details">
-                        <p><strong>Invoice No:</strong> SALE-{{ sale.pk|stringformat:"05d" }}</p>
-                        <p><strong>Issue Date:</strong> {{ sale.sold_at|date:"d M Y, h:i A" }}</p>
-                        <p><strong>Payment Status:</strong> {{ sale.get_payment_status_display }}</p>
-                    </div>
+                <div class="invoice-title-col">
+                    <h2 class="invoice-main-title">SALES INVOICE</h2>
+                    <table class="meta-table">
+                        <tr>
+                            <td class="lbl">Invoice #</td>
+                            <td class="val">SALE-{{ sale.pk|stringformat:"05d" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Invoice date</td>
+                            <td class="val">{{ sale.sold_at|date:"d-m-Y" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Payment Status</td>
+                            <td class="val">
+                                {% if sale.is_paid %}
+                                <span class="payment-badge">PAID</span>
+                                {% elif sale.is_partial %}
+                                <span class="payment-badge">PARTIAL PAYMENT</span>
+                                {% else %}
+                                <span class="payment-badge">UNPAID</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
                 </div>
             </div>
 
@@ -532,34 +535,24 @@
                 <table class="items-table">
                     <thead>
                         <tr>
-                            <th style="width: 35px; text-align: center;">#</th>
-                            <th>Item & Description</th>
-                            <th style="width: 140px;">SKU / Group</th>
-                            <th class="num" style="width: 65px;">Qty</th>
-                            <th class="num" style="width: 110px;">Unit Price (BDT)</th>
-                            <th class="num" style="width: 120px;">Amount (BDT)</th>
+                            <th style="width: 50px;">QTY</th>
+                            <th>Description</th>
+                            <th class="num" style="width: 120px;">Unit Price</th>
+                            <th class="num" style="width: 130px;">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in sale.items.all %}
-                        <tr>
-                            <td style="text-align: center; color: #4b5563; font-size: 12px;">{{ forloop.counter }}</td>
+                        <tr class="item-row">
+                            <td style="font-weight: 600;">{{ item.quantity }}</td>
                             <td>
                                 <span class="item-title">{{ item.display_name }}</span>
+                                {% if not item.product %}
+                                <span class="item-sub">Custom Item</span>
+                                {% elif item.sku %}
+                                <span class="item-sub">SKU: {{ item.sku }}</span>
+                                {% endif %}
                             </td>
-                            <td>
-                                <span class="item-sub">
-                                    {% if item.sku %}
-                                    {{ item.sku }}
-                                    {% endif %}
-                                    {% if item.product and item.product.group %}
-                                    &bull; {{ item.product.group.name }}
-                                    {% elif not item.product %}
-                                    Custom Item
-                                    {% endif %}
-                                </span>
-                            </td>
-                            <td class="num" style="font-weight: 600;">{{ item.quantity }}</td>
                             <td class="num">{{ item.unit_price|floatformat:2 }}</td>
                             <td class="num" style="font-weight: 700;">{{ item.total_amount|floatformat:2 }}</td>
                         </tr>
@@ -568,72 +561,59 @@
                 </table>
             </div>
 
-            <!-- Financial Summary & Signatures -->
-            <div class="bottom-section">
-                <!-- Left: Terms & Signatures -->
-                <div class="terms-block">
-                    <h4>Terms & Conditions</h4>
-                    <p>&bull; Goods once sold can be checked upon receipt. Please keep this invoice for warranty and
-                        support.</p>
-                    <p>&bull; For inquiries, contact Mtronix: 01744676770.</p>
-
-                    <div class="signatures-grid">
-                        <div class="sign-box">Customer's Signature</div>
-                        <div class="sign-box">Authorized Signature</div>
-                    </div>
-                </div>
-
+            <!-- Financial Summary (Directly Below Table) -->
+            <div class="totals-section">
                 <!-- Right: Totals -->
                 <div class="totals-block">
-                    <div class="tot-row grand-total">
-                        <span>TOTAL AMOUNT:</span>
-                        <span class="amount">BDT {{ sale.total_amount|floatformat:2 }}</span>
+                    <div class="tot-row">
+                        <span>Subtotal</span>
+                        <span>BDT {{ sale.total_amount|floatformat:2 }}</span>
                     </div>
-                    <div class="tot-row paid">
-                        <span>PAID AMOUNT:</span>
+                    <div class="tot-row">
+                        <span>Paid Amount</span>
                         <span>BDT {{ sale.effective_paid_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="tot-row grand-total">
+                        <span>Total (BDT)</span>
+                        <span class="amount">BDT {{ sale.total_amount|floatformat:2 }}</span>
                     </div>
                     {% if sale.due_amount > 0 %}
                     <div class="tot-row due">
-                        <span>BALANCE DUE:</span>
+                        <span>BALANCE DUE</span>
                         <span>BDT {{ sale.due_amount|floatformat:2 }}</span>
-                    </div>
-                    {% endif %}
-
-                    <!-- Customer Previous Order Details (Returning Customer Context) -->
-                    {% if prev_history and prev_history.has_previous_orders %}
-                    <div class="prev-orders-box">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                            <span style="font-weight: 700;">Previous Purchases ({{ prev_history.previous_orders_count }} order{% if prev_history.previous_orders_count > 1 %}s{% endif %}):</span>
-                            <span style="font-weight: 700;">BDT {{ prev_history.previous_total_billed|floatformat:2 }}</span>
-                        </div>
-                        {% if prev_history.previous_total_due > 0 %}
-                        <div style="display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 2px;">
-                            <span>Previous Unpaid Due:</span>
-                            <span>BDT {{ prev_history.previous_total_due|floatformat:2 }}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; font-weight: 800; padding-top: 4px; border-top: 1.5px solid #000000; margin-top: 4px; font-size: 13px;">
-                            <span>NET TOTAL OUTSTANDING DUE:</span>
-                            <span>BDT {{ prev_history.net_due|floatformat:2 }}</span>
-                        </div>
-                        {% endif %}
-                        {% if prev_history.last_previous_order_date and prev_history.recent_previous_orders %}
-                        <div style="margin-top: 5px; font-size: 11px; color: #4b5563;">
-                            <span style="font-weight: 600;">Last Bought ({{ prev_history.last_previous_order_date }}):</span>
-                            <span>{{ prev_history.recent_previous_orders.0.items_summary }}</span>
-                        </div>
-                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- Footer -->
-        <div class="invoice-footer">
-            <p>Thank you for doing business with Mtronix!</p>
-            <p style="font-size: 10px; color: #6b7280; margin-top: 2px;">Computer-generated invoice &bull; Software by
-                Intlisoft Innovation (01888-735883)</p>
+        <!-- Absolute Bottom Pinned Container (Signatures & Footer) -->
+        <div class="invoice-bottom-pinned">
+            <!-- Full-Width Signature Options -->
+            <div class="signatures-section">
+                <div class="sign-block">
+                    <div class="sign-line"></div>
+                    <span class="sign-title">Customer's Signature</span>
+                </div>
+                <div class="sign-block">
+                    <div class="sign-line"></div>
+                    <span class="sign-title">Authorized Signature</span>
+                </div>
+            </div>
+
+            <!-- Footer with QR at Most Bottom-Right Position -->
+            <div class="invoice-footer-wrap">
+                <div class="footer-left-text">
+                    <p style="font-weight: 700; color: #000000;">Thank you for doing business with Mtronix!</p>
+                    <p style="font-size: 10px; color: #6b7280; margin-top: 2px;">Computer-generated invoice &bull; Software by Intlisoft Innovation (01888-735883)</p>
+                </div>
+                {% if qr_code_b64 %}
+                <div class="footer-qr-box">
+                    <img src="data:image/png;base64,{{ qr_code_b64 }}" alt="Store Location QR">
+                    <span>Location QR</span>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
