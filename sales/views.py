@@ -84,7 +84,8 @@ def _build_products_catalog():
 
 def _build_customer_suggestions(limit=40):
     """Build returning customer profiles with previous buy details and totals."""
-    sales = Sale.objects.exclude(customer_name='').prefetch_related('items__product').order_by('-sold_at')
+    # Cap at 300 most-recent sales to avoid full-table scan on large databases
+    sales = Sale.objects.exclude(customer_name='').prefetch_related('items__product').order_by('-sold_at')[:300]
     customers = {}
     for sale in sales:
         c_name = (sale.customer_name or '').strip()
@@ -479,19 +480,22 @@ def sale_list(request):
     elif status_filter == 'unpaid':
         sales = sales.filter(payment_status='UNPAID')
 
+    # Apply DB-level ordering for simple time-based sorts to avoid loading
+    # the entire result set into Python before sorting
+    if sort_by == 'oldest':
+        sales = sales.order_by('sold_at')
+    elif sort_by == 'customer':
+        sales = sales.order_by('customer_name')
+    else:  # newest default (also used as fallback before amount sorts)
+        sales = sales.order_by('-sold_at')
+
     all_current_sales = list(sales)
 
-    # Sorting
-    if sort_by == 'oldest':
-        all_current_sales.sort(key=lambda s: s.sold_at)
-    elif sort_by == 'amount_desc':
+    # Python-level sort only for derived fields (total_amount is a @property)
+    if sort_by == 'amount_desc':
         all_current_sales.sort(key=lambda s: s.total_amount, reverse=True)
     elif sort_by == 'amount_asc':
         all_current_sales.sort(key=lambda s: s.total_amount)
-    elif sort_by == 'customer':
-        all_current_sales.sort(key=lambda s: (s.customer_name or '').lower())
-    else:  # newest default
-        all_current_sales.sort(key=lambda s: s.sold_at, reverse=True)
 
     receipt_sale = None
     receipt_pk = request.GET.get('receipt')
@@ -553,9 +557,15 @@ def sale_create(request):
 def sale_toggle_payment_status(request, pk):
     sale = get_object_or_404(Sale, pk=pk)
     if sale.payment_status == 'PAID':
+        # PAID → UNPAID: clear paid amount
         sale.payment_status = 'UNPAID'
         sale.paid_amount = Decimal('0.00')
+    elif sale.payment_status == 'PARTIAL':
+        # PARTIAL → PAID: mark as fully paid
+        sale.payment_status = 'PAID'
+        sale.paid_amount = sale.total_amount
     else:
+        # UNPAID → PAID: mark as fully paid
         sale.payment_status = 'PAID'
         sale.paid_amount = sale.total_amount
     sale.save(update_fields=['payment_status', 'paid_amount'])
@@ -567,22 +577,38 @@ def sale_toggle_payment_status(request, pk):
 def _get_customer_previous_history(sale):
     """
     Returns previous order statistics and previous items for returning customers prior to this sale.
-    Returns None if this is a first-time customer or Walk-in.
+    Returns zero summary dictionary if this is a first-time customer or Walk-in.
     """
     c_name = (sale.customer_name or '').strip()
     c_phone = (sale.customer_phone or '').strip()
 
+    default_data = {
+        'has_previous_orders': False,
+        'previous_orders_count': 0,
+        'previous_total_billed': Decimal('0.00'),
+        'previous_total_paid': Decimal('0.00'),
+        'previous_total_due': Decimal('0.00'),
+        'current_due': sale.due_amount,
+        'net_due': sale.due_amount,
+        'recent_previous_orders': [],
+        'last_previous_order_date': None,
+    }
+
     if not c_name and not c_phone:
-        return None
+        return default_data
     if c_name.lower() in ('walk-in', 'walk-in customer', 'walk in', 'cash'):
-        return None
+        return default_data
 
     # Match previous sales by customer name or phone (before current sale)
     q = models.Q()
     if c_name:
         q |= models.Q(customer_name__iexact=c_name)
     if c_phone:
-        q |= models.Q(customer_phone=c_phone)
+        clean_phone = re.sub(r'\D', '', c_phone)
+        if len(clean_phone) >= 7:
+            q |= models.Q(customer_phone__icontains=clean_phone[-10:])
+        else:
+            q |= models.Q(customer_phone=c_phone)
 
     prev_sales_qs = Sale.objects.filter(q).exclude(pk=sale.pk)
     if sale.sold_at and sale.pk:
@@ -592,7 +618,7 @@ def _get_customer_previous_history(sale):
 
     prev_sales = list(prev_sales_qs.prefetch_related('items__product').order_by('-sold_at'))
     if not prev_sales:
-        return None
+        return default_data
 
     prev_orders_count = len(prev_sales)
     prev_total_billed = sum(s.total_amount for s in prev_sales)
@@ -639,6 +665,7 @@ def sale_receipt_print(request, pk):
         'sale': sale,
         'qr_code_b64': qr_code_b64,
         'prev_history': prev_history,
+        'authorized_by': request.user,
     })
 
 
@@ -648,7 +675,10 @@ def sale_receipt_pdf(request, pk):
         pk=pk
     )
     prev_history = _get_customer_previous_history(sale)
-    response = HttpResponse(build_sale_receipt_pdf(sale, prev_history=prev_history), content_type='application/pdf')
+    response = HttpResponse(
+        build_sale_receipt_pdf(sale, prev_history=prev_history, authorized_by=request.user),
+        content_type='application/pdf'
+    )
     response['Content-Disposition'] = f'inline; filename="sale-{sale.pk}-receipt.pdf"'
     return response
 

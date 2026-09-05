@@ -1,10 +1,14 @@
+from decimal import Decimal
 from django.contrib.auth.models import User
+from django.db.models import ProtectedError
 from django.test import TestCase
 
 from inventory.models import Inventory
 from inventory.services import InventoryService
 from products.models import Product
+from purchases.models import Purchase
 from sales.models import Sale, SaleItem
+from suppliers.models import Supplier
 
 
 class SalePageTests(TestCase):
@@ -519,6 +523,82 @@ class SalePageTests(TestCase):
         self.assertIsNotNone(sm)
         self.assertEqual(sm.quantity, -3)
         self.assertEqual(sm.user, self.user)
+
+    def test_sale_toggle_payment_status_transitions(self):
+        InventoryService.add_stock(self.product, 10)
+        sale = InventoryService.create_sale(
+            customer_name='Toggle Test',
+            payment_status='PAID',
+            items=[{'product': self.product, 'quantity': 2, 'unit_price': '10.00'}],
+        )
+        self.assertEqual(sale.payment_status, 'PAID')
+        self.assertEqual(sale.paid_amount, Decimal('20.00'))
+
+        # PAID -> UNPAID
+        response = self.client.post(f'/sales/{sale.pk}/toggle-status/')
+        self.assertEqual(response.status_code, 302)
+        sale.refresh_from_db()
+        self.assertEqual(sale.payment_status, 'UNPAID')
+        self.assertEqual(sale.paid_amount, Decimal('0.00'))
+
+        # UNPAID -> PAID
+        response = self.client.post(f'/sales/{sale.pk}/toggle-status/')
+        self.assertEqual(response.status_code, 302)
+        sale.refresh_from_db()
+        self.assertEqual(sale.payment_status, 'PAID')
+        self.assertEqual(sale.paid_amount, Decimal('20.00'))
+
+        # Set to PARTIAL with partial payment
+        sale.payment_status = 'PARTIAL'
+        sale.paid_amount = Decimal('8.00')
+        sale.save()
+
+        # PARTIAL -> PAID
+        response = self.client.post(f'/sales/{sale.pk}/toggle-status/')
+        self.assertEqual(response.status_code, 302)
+        sale.refresh_from_db()
+        self.assertEqual(sale.payment_status, 'PAID')
+        self.assertEqual(sale.paid_amount, Decimal('20.00'))
+
+    def test_sale_receipt_renders_authorized_signature_and_previous_buy(self):
+        InventoryService.add_stock(self.product, 20)
+        # First sale for Rahim
+        sale1 = InventoryService.create_sale(
+            customer_name='Rahim Uddin',
+            customer_phone='01700000001',
+            items=[{'product': self.product, 'quantity': 1, 'unit_price': '50.00'}],
+        )
+        # Second sale for Rahim
+        sale2 = InventoryService.create_sale(
+            customer_name='Rahim Uddin',
+            customer_phone='01700000001',
+            items=[{'product': self.product, 'quantity': 2, 'unit_price': '50.00'}],
+        )
+
+        response = self.client.get(f'/sales/{sale2.pk}/receipt/')
+        self.assertEqual(response.status_code, 200)
+        # Check cursive signature font and authorized username
+        self.assertContains(response, 'Dancing Script')
+        self.assertContains(response, 'Authorized Signature')
+        self.assertContains(response, self.user.username)
+        # Check previous buy details
+        self.assertContains(response, 'Previous Buy')
+        self.assertContains(response, '50.00')
+
+    def test_purchase_foreign_keys_protected_on_delete(self):
+        supplier = Supplier.objects.create(name='Test Supplier', phone='01800000000')
+        purchase = Purchase.objects.create(
+            supplier=supplier,
+            product=self.product,
+            quantity=5,
+            unit_price=Decimal('10.00'),
+        )
+        with self.assertRaises(ProtectedError):
+            supplier.delete()
+
+        with self.assertRaises(ProtectedError):
+            self.product.delete()
+
 
 
 

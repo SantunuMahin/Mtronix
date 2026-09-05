@@ -434,7 +434,7 @@ def _make_footer_ops(
 
 
 # ── 1. Sale Receipt PDF ──────────────────────────────────────────────────────
-def build_sale_receipt_pdf(sale, prev_history=None) -> bytes:
+def build_sale_receipt_pdf(sale, prev_history=None, authorized_by=None) -> bytes:
     """Generate a high-end multi-page PDF receipt matching the reference layout with logo."""
     sold_at = _bd_time(sale.sold_at)
     customer = sale.customer_name or 'Walk-in Customer'
@@ -573,21 +573,12 @@ def build_sale_receipt_pdf(sale, prev_history=None) -> bytes:
         pc._streams.append(_text_right(curr_tot_y, f'BDT {due_amt:.2f}', 10, 558, bold=True, r=0.0, g=0.0, b=0.0))
         curr_tot_y -= 12
 
-    # Previous Orders Summary (if returning customer)
-    if has_prev:
-        pc._streams.append(_line(box_x, curr_tot_y, 558, curr_tot_y, 0.0, 0.0, 0.0, 0.5))
-        curr_tot_y -= 12
-        prev_cnt = prev_history['previous_orders_count']
-        prev_due = float(prev_history['previous_total_due'])
-        net_due = float(prev_history['net_due'])
-
-        pc._streams.append(_text_line(curr_tot_y, f'Prev Purchases ({prev_cnt} orders):', 7.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
-        pc._streams.append(_text_right(curr_tot_y, f'BDT {float(prev_history["previous_total_billed"]):.2f}', 8, 558, r=0.0, g=0.0, b=0.0))
-
-        if prev_due > 0:
-            curr_tot_y -= 12
-            pc._streams.append(_text_line(curr_tot_y, 'NET TOTAL DUE:', 8.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
-            pc._streams.append(_text_right(curr_tot_y, f'BDT {net_due:.2f}', 9.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    # Previous Orders Summary (single clean line)
+    pc._streams.append(_line(box_x, curr_tot_y, 558, curr_tot_y, 0.0, 0.0, 0.0, 0.5))
+    curr_tot_y -= 12
+    prev_billed = float(prev_history.get('previous_total_billed', 0.0)) if prev_history else 0.0
+    pc._streams.append(_text_line(curr_tot_y, 'Previous Buy:', 8.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(curr_tot_y, f'BDT {prev_billed:.2f}', 9, 558, bold=True, r=0.0, g=0.0, b=0.0))
 
     pc._streams.append(_line(54, curr_tot_y - 6, 558, curr_tot_y - 6, 0.0, 0.0, 0.0, 1.5))
 
@@ -598,6 +589,10 @@ def build_sale_receipt_pdf(sale, prev_history=None) -> bytes:
 
     pc._streams.append(_line(54, sign_y, 195, sign_y, 0.0, 0.0, 0.0, 1.0))
     pc._streams.append(_text_line(sign_y - 10, "Customer's Signature", 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
+
+    if authorized_by and hasattr(authorized_by, 'is_authenticated') and authorized_by.is_authenticated:
+        auth_name = authorized_by.get_full_name() or authorized_by.username
+        pc._streams.append(_text_line(sign_y + 4, auth_name[:25], 9, 417, bold=True, r=0.0, g=0.0, b=0.0))
 
     pc._streams.append(_line(417, sign_y, 558, sign_y, 0.0, 0.0, 0.0, 1.0))
     pc._streams.append(_text_line(sign_y - 10, "Authorized Signature", 8, 417, bold=True, r=0.0, g=0.0, b=0.0))

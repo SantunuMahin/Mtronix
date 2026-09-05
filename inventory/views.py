@@ -56,7 +56,19 @@ def _get_date_range_for_period(period):
 
 def _build_chart_trend_data(period, sales_qs):
     now = timezone.now().astimezone(BD_TZ)
-    all_sales = list(sales_qs)
+    if period == 'today':
+        earliest = (now - datetime.timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == 'week':
+        start_of_week = now - datetime.timedelta(days=now.weekday())
+        earliest = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == 'month':
+        earliest = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif period == 'year':
+        earliest = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:  # 'all' -> last 6 months
+        earliest = (now - datetime.timedelta(days=185)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    all_sales = list(sales_qs.filter(sold_at__gte=earliest))
 
     labels = []
     revenue_series = []
@@ -189,11 +201,11 @@ def dashboard(request):
         items_qs = items_qs.filter(sale__sold_at__range=(start_date, end_date))
     period_units_sold = sum(item.quantity for item in items_qs)
 
-    # Store-wide all time receivables (total unpaid & partial due across all sales)
-    all_sales = list(Sale.objects.all())
-    store_total_due = sum(s.due_amount for s in all_sales)
-    store_total_revenue = sum(s.total_amount for s in all_sales)
-    store_total_paid = sum(s.effective_paid_amount for s in all_sales)
+    # Store-wide all time receivables — lean queryset to avoid full model loads
+    all_sales_summary = Sale.objects.only('payment_status', 'paid_amount').prefetch_related('items')
+    store_total_due = sum(s.due_amount for s in all_sales_summary)
+    store_total_revenue = sum(s.total_amount for s in all_sales_summary)
+    store_total_paid = sum(s.effective_paid_amount for s in all_sales_summary)
 
     # Realized Gross Profit in period
     period_gross_profit = Decimal('0.00')
@@ -269,7 +281,7 @@ def dashboard(request):
     chart_payment_labels = ['Paid (Cash In)', 'Due (Receivables)']
     chart_payment_data = [float(period_paid), float(period_due)]
 
-    # Time series trend data
+    # Time series trend data — query is bounded by earliest date inside the helper
     chart_trend_data = _build_chart_trend_data(period, sales_qs)
 
     context = {
@@ -416,9 +428,12 @@ def inventory_logs(request):
 
     all_products = Product.objects.all().order_by('name')
 
+    # Count BEFORE slicing (sliced querysets cannot be counted)
+    total_movements_count = movements.count()
+
     return render(request, 'inventory/logs.html', {
         'movements': movements[:150],
-        'total_movements_count': movements.count(),
+        'total_movements_count': total_movements_count,
         'selected_product_id': product_id,
         'selected_type': movement_type,
         'query': query,

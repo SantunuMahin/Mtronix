@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&family=Dancing+Script:wght@700&display=swap"
         rel="stylesheet">
     <style>
         * {
@@ -583,6 +583,10 @@
                         <span>BDT {{ sale.due_amount|floatformat:2 }}</span>
                     </div>
                     {% endif %}
+                    <div class="tot-row" style="font-size: 12.5px; color: #111827; border-top: 1px dashed #9ca3af; margin-top: 6px; padding-top: 6px;">
+                        <span style="font-weight: 700;">Previous Buy</span>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700;">BDT {{ prev_history.previous_total_billed|default:0|floatformat:2 }}</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -596,8 +600,22 @@
                     <span class="sign-title">Customer's Signature</span>
                 </div>
                 <div class="sign-block">
+                    {% if authorized_by and authorized_by.is_authenticated %}
+                    <div style="min-height: 36px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px;">
+                        <span style="font-family: 'Dancing Script', cursive; font-size: 28px; font-weight: 700; color: #000000; line-height: 1; letter-spacing: 0.5px;">
+                            {{ authorized_by.get_full_name|default:authorized_by.username }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <div style="min-height: 36px;"></div>
+                    {% endif %}
                     <div class="sign-line"></div>
                     <span class="sign-title">Authorized Signature</span>
+                    {% if authorized_by and authorized_by.is_authenticated %}
+                    <span style="display:block; font-size: 10px; color: #4b5563; margin-top: 2px;">
+                        {% if authorized_by.profile and authorized_by.profile.get_role_display %}{{ authorized_by.profile.get_role_display }} &bull; {% endif %}{{ sale.sold_at|date:"d M Y" }}
+                    </span>
+                    {% endif %}
                 </div>
             </div>
 
