@@ -414,6 +414,7 @@
 
         /* ── Print Optimization for Canon LBP 6030 (A4 Laser) ── */
         @media print {
+
             html,
             body {
                 height: 100% !important;
@@ -469,7 +470,8 @@
     <div class="toolbar">
         <a href="{% url 'sales:list' %}" class="btn btn-secondary">&larr; Back to Sales</a>
         <div style="display: flex; gap: 8px;">
-            <a href="{% url 'sales:receipt_pdf' sale.pk %}" class="btn btn-secondary" target="_blank">📄 Download PDF</a>
+            <a href="{% url 'sales:receipt_pdf' sale.pk %}" class="btn btn-secondary" target="_blank">📄 Download
+                PDF</a>
             <button onclick="window.print()" class="btn btn-primary">🖨️ Print Invoice (A4)</button>
         </div>
     </div>
@@ -496,7 +498,8 @@
                     <div class="customer-name">
                         <span>{{ sale.customer_name|default:"Walk-in Customer" }}</span>
                         {% if prev_history and prev_history.has_previous_orders %}
-                        <span class="cust-tag">Returning Customer (Order #{{ prev_history.previous_orders_count|add:1 }})</span>
+                        <span class="cust-tag">Returning Customer (Order #{{ prev_history.previous_orders_count|add:1
+                            }})</span>
                         {% endif %}
                     </div>
                     <div class="customer-details">
@@ -592,9 +595,12 @@
                         <span>BDT {{ sale.due_amount|floatformat:2 }}</span>
                     </div>
                     {% endif %}
-                    <div class="tot-row" style="font-size: 12.5px; color: #111827; border-top: 1px dashed #9ca3af; margin-top: 6px; padding-top: 6px;">
+                    <div class="tot-row"
+                        style="font-size: 12.5px; color: #111827; border-top: 1px dashed #9ca3af; margin-top: 6px; padding-top: 6px;">
                         <span style="font-weight: 700;">Previous Buy</span>
-                        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700;">BDT {{ prev_history.previous_total_billed|default:0|floatformat:2 }}</span>
+                        <span
+                            style="font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap;">BDT
+                            {{ prev_history.previous_total_billed|default:0 }}</span>
                     </div>
                 </div>
             </div>
@@ -610,8 +616,10 @@
                 </div>
                 <div class="sign-block">
                     {% if authorized_by and authorized_by.is_authenticated %}
-                    <div style="min-height: 36px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px;">
-                        <span style="font-family: 'Dancing Script', cursive; font-size: 28px; font-weight: 700; color: #000000; line-height: 1; letter-spacing: 0.5px;">
+                    <div
+                        style="min-height: 36px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px;">
+                        <span
+                            style="font-family: 'Dancing Script', cursive; font-size: 28px; font-weight: 700; color: #000000; line-height: 1; letter-spacing: 0.5px;">
                             {{ authorized_by.get_full_name|default:authorized_by.username }}
                         </span>
                     </div>
@@ -622,7 +630,8 @@
                     <span class="sign-title">Authorized Signature</span>
                     {% if authorized_by and authorized_by.is_authenticated %}
                     <span style="display:block; font-size: 10px; color: #4b5563; margin-top: 2px;">
-                        {% if authorized_by.profile and authorized_by.profile.get_role_display %}{{ authorized_by.profile.get_role_display }} &bull; {% endif %}{{ sale.sold_at|date:"d M Y" }}
+                        {% if authorized_by.profile and authorized_by.profile.get_role_display %}{{
+                        authorized_by.profile.get_role_display }} &bull; {% endif %}{{ sale.sold_at|date:"d M Y" }}
                     </span>
                     {% endif %}
                 </div>
@@ -632,7 +641,8 @@
             <div class="invoice-footer-wrap">
                 <div class="footer-left-text">
                     <p style="font-weight: 700; color: #000000;">Thank you for doing business with Mtronix!</p>
-                    <p style="font-size: 10px; color: #6b7280; margin-top: 2px;">Computer-generated invoice &bull; Software by Intlisoft Innovation (01888-735883)</p>
+                    <p style="font-size: 10px; color: #6b7280; margin-top: 2px;">Computer-generated invoice &bull;
+                        Designed & Developed by <b>Intlisoft Innovation</b> (01888-735883)</p>
                 </div>
                 {% if qr_code_b64 %}
                 <div class="footer-qr-box">
