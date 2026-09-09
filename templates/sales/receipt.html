@@ -565,8 +565,8 @@
                             </td>
                             <td style="font-size: 11.5px; color: #374151; font-weight: 500;">{{ item.group_name }}</td>
                             <td class="num" style="font-weight: 600;">{{ item.quantity }}</td>
-                            <td class="num">{{ item.unit_price|floatformat:"-2" }}</td>
-                            <td class="num" style="font-weight: 700;">{{ item.total_amount|floatformat:"-2" }}</td>
+                            <td class="num">{{ item.unit_price|floatformat:2 }}</td>
+                            <td class="num" style="font-weight: 700;">{{ item.total_amount|floatformat:2 }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -579,28 +579,26 @@
                 <div class="totals-block">
                     <div class="tot-row">
                         <span>Subtotal</span>
-                        <span>BDT {{ sale.total_amount|floatformat:"-2" }}</span>
+                        <span>BDT {{ sale.total_amount|floatformat:2 }}</span>
                     </div>
                     <div class="tot-row">
                         <span>Paid Amount</span>
-                        <span>BDT {{ sale.effective_paid_amount|floatformat:"-2" }}</span>
+                        <span>BDT {{ sale.effective_paid_amount|floatformat:2 }}</span>
                     </div>
                     <div class="tot-row grand-total">
                         <span>Total (BDT)</span>
-                        <span class="amount">BDT {{ sale.total_amount|floatformat:"-2" }}</span>
+                        <span class="amount">BDT {{ sale.total_amount|floatformat:2 }}</span>
                     </div>
                     {% if sale.due_amount > 0 %}
                     <div class="tot-row due">
                         <span>BALANCE DUE</span>
-                        <span>BDT {{ sale.due_amount|floatformat:"-2" }}</span>
+                        <span>BDT {{ sale.due_amount|floatformat:2 }}</span>
                     </div>
                     {% endif %}
                     <div class="tot-row"
                         style="font-size: 12.5px; color: #111827; border-top: 1px dashed #9ca3af; margin-top: 6px; padding-top: 6px;">
                         <span style="font-weight: 700;">Previous Buy</span>
-                        <span
-                            style="font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap;">BDT
-                            {{ prev_history.previous_total_billed|default:0|floatformat:"-2" }}</span>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap;">BDT {{ prev_history.previous_total_billed|default:0 }}</span>
                     </div>
                 </div>
             </div>
@@ -641,8 +639,8 @@
                 <div class="footer-left-text">
                     <p style="font-weight: 700; color: #000000; font-size: 11.5px;">Thank you for doing business with
                         Mtronix!</p>
-                    <p style="font-size: 10px; color: #6b7280; margin-top: 3px;">
-                        Computer-generated invoice &bull; Software by <strong style="color: #111827; font-weight: 700;">Intlisoft Innovation</strong> <a href="tel:+8801888735883" style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #1f2937; font-weight: 600; text-decoration: none; background: #f3f4f6; padding: 1px 5px; border-radius: 3px; border: 1px solid #e5e7eb;">(+880) 1888-735883</a>
+                    <p style="font-size: 10px; color: #6b7280; margin-top: 3px; line-height: 1.4;">
+                        Computer-generated invoice &bull; Software by <strong style="color: #111827; font-weight: 700;">Intlisoft Innovation</strong> <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: #1f2937; font-weight: 600;">(+880) 1888-735883</span>
                     </p>
                 </div>
                 {% if qr_code_b64 %}
