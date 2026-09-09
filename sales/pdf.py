@@ -174,9 +174,11 @@ def _badge(
     size: int = 8,
 ) -> str:
     """Render a clean monochrome status badge."""
+    text_w = len(str(text)) * (size * 0.52)
+    tx = x + max(2.0, (w - text_w) / 2.0)
     ops = [
         _rect_stroke(x, y, w, h, 0.0, 0.0, 0.0, 0.75),
-        _text_line(y + 3.5, text, size=size, x=x + 4, bold=True, r=0.0, g=0.0, b=0.0),
+        _text_line(y + 3.2, text, size=size, x=tx, bold=True, r=fg[0], g=fg[1], b=fg[2]),
     ]
     return '\n'.join(ops)
 
@@ -239,12 +241,63 @@ def _get_logo_image_data() -> tuple[int, int, bytes] | None:
     return None
 
 
+def _generate_cursive_signature_image_data(name: str) -> tuple[int, int, bytes] | None:
+    """Generate high-resolution cursive signature image for authorized signatory."""
+    if not name or not name.strip():
+        return None
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import os
+        from django.conf import settings
+
+        font_candidates = [
+            os.path.join(settings.BASE_DIR, 'static', 'fonts', 'cursive_signature.ttf'),
+            os.path.join(settings.BASE_DIR, 'static', 'fonts', 'DancingScript-Bold.ttf'),
+            'C:/Windows/Fonts/segoescb.ttf',
+            'C:/Windows/Fonts/segoesc.ttf',
+            'C:/Windows/Fonts/BRUSHSCI.TTF',
+            'C:/Windows/Fonts/FRSCRIPT.TTF',
+            'C:/Windows/Fonts/LHANDW.TTF',
+        ]
+        font_path = next((f for f in font_candidates if os.path.exists(f)), None)
+        font_size = 54
+        font = ImageFont.truetype(font_path, font_size) if font_path else ImageFont.load_default()
+
+        bbox = font.getbbox(name)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+
+        pad_x = 24
+        pad_y = 16
+        img_w = max(10, text_w + pad_x * 2)
+        img_h = max(10, text_h + pad_y * 2)
+
+        img = Image.new('RGB', (img_w, img_h), (255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        draw.text((pad_x - bbox[0], pad_y - bbox[1]), name, fill=(0, 0, 0), font=font)
+
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=95)
+        return (img_w, img_h, buf.getvalue())
+    except Exception:
+        return None
+
+
 # ── Multi-page PDF builder ───────────────────────────────────────────────────
 class PdfBuilder:
-    def __init__(self, auto_print: bool = False, image_data: tuple[int, int, bytes] | None = None) -> None:
+    def __init__(
+        self,
+        auto_print: bool = False,
+        image_data: tuple[int, int, bytes] | None = None,
+        images: dict[str, tuple[int, int, bytes]] | None = None,
+    ) -> None:
         self._pages: List[List[str]] = []
         self.auto_print = auto_print
-        self.image_data = image_data
+        self.images: dict[str, tuple[int, int, bytes]] = {}
+        if image_data is not None:
+            self.images['Im1'] = image_data
+        if images:
+            self.images.update(images)
 
     def add_page(self, streams: List[str]) -> None:
         self._pages.append(streams)
@@ -259,16 +312,20 @@ class PdfBuilder:
         FONT_F1 = 3
         FONT_F2 = 4
 
-        has_image = self.image_data is not None
-        IMAGE_OBJ = 5 if has_image else None
+        # Image objects start at 5
+        image_obj_map: dict[str, int] = {}
+        curr_obj = 5
+        for img_name in self.images:
+            image_obj_map[img_name] = curr_obj
+            curr_obj += 1
 
-        PAGE_START = 6 if has_image else 5
+        PAGE_START = curr_obj
         CONT_START = PAGE_START + n
 
         page_obj_nums = [PAGE_START + i for i in range(n)]
         cont_obj_nums = [CONT_START + i for i in range(n)]
 
-        objects: Dict[int, bytes] = {}
+        objects: dict[int, bytes] = {}
 
         if self.auto_print:
             objects[CATALOG] = (
@@ -283,9 +340,9 @@ class PdfBuilder:
         objects[FONT_F1] = b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'
         objects[FONT_F2] = b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'
 
-        if has_image:
-            img_w, img_h, img_bytes = self.image_data
-            objects[IMAGE_OBJ] = (
+        for img_name, (img_w, img_h, img_bytes) in self.images.items():
+            img_obj_num = image_obj_map[img_name]
+            objects[img_obj_num] = (
                 f'<< /Type /XObject /Subtype /Image /Width {img_w} /Height {img_h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(img_bytes)} >>\nstream\n'.encode('ascii')
                 + img_bytes
                 + b'\nendstream'
@@ -293,8 +350,9 @@ class PdfBuilder:
 
         for i, page_obj in enumerate(page_obj_nums):
             cont_obj = cont_obj_nums[i]
-            if has_image:
-                res_str = f'/Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /Im1 {IMAGE_OBJ} 0 R >> >>'
+            if self.images:
+                xobj_entries = ' '.join(f'/{img_name} {image_obj_map[img_name]} 0 R' for img_name in self.images)
+                res_str = f'/Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << {xobj_entries} >> >>'
             else:
                 res_str = f'/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >>'
             objects[page_obj] = (
@@ -344,12 +402,14 @@ class PageComposer:
         footer_fn: Callable[[int, bool], List[str]],
         page_top: float = 620.0,
         page_bottom: float = 70.0,
+        page_top_subsequent: float | None = None,
     ) -> None:
         self.builder = builder
         self.header_fn = header_fn
         self.footer_fn = footer_fn
         self.page_top = page_top
         self.page_bottom = page_bottom
+        self.page_top_subsequent = page_top_subsequent if page_top_subsequent is not None else page_top
         self.page_no = 0
         self._y = page_top
         self._streams: List[str] = []
@@ -359,7 +419,7 @@ class PageComposer:
         self.page_no += 1
         self._streams = []
         self._streams.extend(self.header_fn(self.page_no))
-        self._y = self.page_top
+        self._y = self.page_top if self.page_no == 1 else self.page_top_subsequent
 
     def _close_page(self, is_last: bool = False) -> None:
         self._streams.extend(self.footer_fn(self.page_no, is_last))
@@ -454,15 +514,14 @@ def build_sale_receipt_pdf(sale, prev_history=None, authorized_by=None) -> bytes
         ops = []
         if page_no == 1:
             # ── Top Left: Company Info ──
-            ops.append(_text_line(762, 'MTRONIX', 20, 54, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_text_line(748, 'ELECTRONICS, HARDWARE & COMPONENTS', 8, 54, bold=True, r=0.2, g=0.2, b=0.2))
-            ops.append(_text_line(735, MTRONIX_ADDRESS, 8, 54, r=0.25, g=0.25, b=0.25))
-            ops.append(_text_line(723, f'Phone: {MTRONIX_PHONE}  |  Email: {MTRONIX_EMAIL}', 8, 54, r=0.25, g=0.25, b=0.25))
+            ops.append(_text_line(758, 'MTRONIX', 20, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(744, 'ELECTRONICS, HARDWARE & COMPONENTS', 7.5, 54, bold=True, r=0.3, g=0.3, b=0.3))
+            ops.append(_text_line(732, MTRONIX_ADDRESS, 7.5, 54, r=0.3, g=0.3, b=0.3))
+            ops.append(_text_line(720, f'Phone: {MTRONIX_PHONE}  |  Email: {MTRONIX_EMAIL}', 7.5, 54, r=0.3, g=0.3, b=0.3))
 
             # ── Top Right: Logo or QR ──
             if logo_data:
-                # Draw logo (88pt wide x 66pt high)
-                ops.append('q 88 0 0 66 470 705 cm /Im1 Do Q')
+                ops.append('q 84 0 0 63 474 706 cm /Im1 Do Q')
             elif qr_matrix:
                 qr_size = len(qr_matrix) * qr_cell
                 card_w = qr_size + 14
@@ -475,127 +534,180 @@ def build_sale_receipt_pdf(sale, prev_history=None, authorized_by=None) -> bytes
                 ops.append(_text_line(card_y + card_h - 10, 'SCAN LOCATION', 6.0, card_x + 4, bold=True, r=0.0, g=0.0, b=0.0))
                 ops.append(_qr_pdf_stream(qr_matrix, qr_x, qr_y, qr_cell))
 
-            # ── Meta Details Section (Bill To Left, SALES INVOICE Right) ──
-            ops.append(_line(54, 696, 558, 696, r=0.0, g=0.0, b=0.0, width=0.75))
+            # ── Divider below header ──
+            ops.append(_line(54, 696, 558, 696, r=0.85, g=0.87, b=0.90, width=0.75))
 
+            # ── Meta Details Section (Bill To Left, SALES INVOICE Right) ──
             # Left: Bill To
-            ops.append(_text_line(682, 'BILL TO', 7.5, 54, bold=True, r=0.3, g=0.3, b=0.3))
+            ops.append(_text_line(678, 'BILL TO', 7.5, 54, bold=True, r=0.45, g=0.45, b=0.45))
             cust_display = customer
             if prev_history and prev_history.get('has_previous_orders'):
                 cust_display += f" (Order #{prev_history['previous_orders_count'] + 1})"
-            ops.append(_text_line(668, cust_display[:32], 11, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(663, cust_display[:30], 11, 54, bold=True, r=0.0, g=0.0, b=0.0))
             if address:
-                ops.append(_text_line(655, address[:40], 8, 54, r=0.25, g=0.25, b=0.25))
+                ops.append(_text_line(650, address[:42], 8, 54, r=0.3, g=0.3, b=0.3))
             if phone:
-                ops.append(_text_line(643 if address else 655, f'Phone: {phone}', 8, 54, r=0.25, g=0.25, b=0.25))
+                ops.append(_text_line(638 if address else 650, f'Phone: {phone}', 8, 54, r=0.3, g=0.3, b=0.3))
 
             # Right: SALES INVOICE
-            ops.append(_text_right(684, 'SALES INVOICE', 16, 558, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_text_line(668, 'Invoice #', 8, 430, bold=True, r=0.25, g=0.25, b=0.25))
-            ops.append(_text_right(668, f'SALE-{sale.pk:05d}', 8.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(674, 'SALES INVOICE', 15, 558, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(656, 'Invoice #', 8, 436, bold=True, r=0.35, g=0.35, b=0.35))
+            ops.append(_text_right(656, f'SALE-{sale.pk:05d}', 8.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
 
-            ops.append(_text_line(656, 'Invoice date', 8, 430, bold=True, r=0.25, g=0.25, b=0.25))
-            ops.append(_text_right(656, sold_at[:11], 8, 558, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(644, 'Invoice date', 8, 436, bold=True, r=0.35, g=0.35, b=0.35))
+            ops.append(_text_right(644, sold_at[:11], 8, 558, r=0.0, g=0.0, b=0.0))
 
-            ops.append(_text_line(644, 'Payment Status', 8, 430, bold=True, r=0.25, g=0.25, b=0.25))
-            ops.append(_text_right(644, status_str, 8, 558, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(632, 'Payment Status', 8, 436, bold=True, r=0.35, g=0.35, b=0.35))
+            badge_w = 46 if is_paid else (62 if is_partial else 52)
+            ops.append(_badge(558 - badge_w, 624, status_str, w=badge_w, h=13, size=7))
 
-            curr_y = 630
+            curr_y = 604
             # ── Table Header Bar ──
-            ops.append(_line(54, curr_y + 8, 558, curr_y + 8, r=0.0, g=0.0, b=0.0, width=1.5))
-            ops.append(_text_line(curr_y, 'QTY', 8.5, 54, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_text_line(curr_y, 'DESCRIPTION', 8.5, 95, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_text_right(curr_y, 'UNIT PRICE (BDT)', 8.5, 460, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_text_right(curr_y, 'AMOUNT (BDT)', 8.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_line(54, curr_y - 8, 558, curr_y - 8, r=0.0, g=0.0, b=0.0, width=1.5))
+            ops.append(_line(54, curr_y + 9, 558, curr_y + 9, r=0.0, g=0.0, b=0.0, width=1.25))
+            ops.append(_text_line(curr_y, 'SL', 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(curr_y, 'DESCRIPTION', 8, 82, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(curr_y, 'CATEGORY', 8, 270, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y, 'QTY', 8, 380, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y, 'UNIT PRICE (BDT)', 8, 470, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y, 'AMOUNT (BDT)', 8, 558, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, curr_y - 7, 558, curr_y - 7, r=0.0, g=0.0, b=0.0, width=1.25))
         else:
             ops.append(_text_line(760, f'Mtronix Sales Invoice - SALE-{sale.pk:05d} (Page {page_no})', 9, 54, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_line(54, 750, 558, 750, r=0.0, g=0.0, b=0.0, width=0.75))
+            ops.append(_line(54, 750, 558, 750, r=0.85, g=0.87, b=0.90, width=0.75))
             curr_y = 730
-            ops.append(_line(54, curr_y + 8, 558, curr_y + 8, r=0.0, g=0.0, b=0.0, width=1.5))
-            ops.append(_text_line(curr_y, 'QTY', 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_text_line(curr_y, 'DESCRIPTION', 8, 95, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_text_right(curr_y, 'UNIT PRICE (BDT)', 8, 460, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_line(54, curr_y + 9, 558, curr_y + 9, r=0.0, g=0.0, b=0.0, width=1.25))
+            ops.append(_text_line(curr_y, 'SL', 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(curr_y, 'DESCRIPTION', 8, 82, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_line(curr_y, 'CATEGORY', 8, 270, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y, 'QTY', 8, 380, bold=True, r=0.0, g=0.0, b=0.0))
+            ops.append(_text_right(curr_y, 'UNIT PRICE (BDT)', 8, 470, bold=True, r=0.0, g=0.0, b=0.0))
             ops.append(_text_right(curr_y, 'AMOUNT (BDT)', 8, 558, bold=True, r=0.0, g=0.0, b=0.0))
-            ops.append(_line(54, curr_y - 8, 558, curr_y - 8, r=0.0, g=0.0, b=0.0, width=1.5))
+            ops.append(_line(54, curr_y - 7, 558, curr_y - 7, r=0.0, g=0.0, b=0.0, width=1.25))
 
         return ops
 
     def footer(page_no: int, is_last: bool) -> List[str]:
         return _make_footer_ops(page_no, is_last)
 
-    builder = PdfBuilder(auto_print=True, image_data=logo_data)
-    pc = PageComposer(builder, header_fn=header, footer_fn=footer, page_top=598.0)
+    # Authorized signatory and cursive signature generation
+    auth_name = ''
+    auth_role = ''
+    if authorized_by:
+        if hasattr(authorized_by, 'is_authenticated') and authorized_by.is_authenticated:
+            auth_name = authorized_by.get_full_name() or authorized_by.username
+            if hasattr(authorized_by, 'profile') and authorized_by.profile and hasattr(authorized_by.profile, 'get_role_display'):
+                auth_role = authorized_by.profile.get_role_display()
+        elif isinstance(authorized_by, str):
+            auth_name = authorized_by
+
+    sign_name = auth_name.title() if (auth_name and auth_name.islower()) else auth_name
+    sign_img_data = _generate_cursive_signature_image_data(sign_name) if sign_name else None
+
+    pdf_images: dict[str, tuple[int, int, bytes]] = {}
+    if logo_data:
+        pdf_images['Im1'] = logo_data
+    if sign_img_data:
+        pdf_images['SignIm'] = sign_img_data
+
+    builder = PdfBuilder(auto_print=True, images=pdf_images)
+    pc = PageComposer(builder, header_fn=header, footer_fn=footer, page_top=580.0, page_top_subsequent=710.0)
 
     # ── Item Rows ──
-    for idx, item in enumerate(sale.items.select_related('product').all()):
-        pc.ensure(22)
+    for idx, item in enumerate(sale.items.select_related('product__group').all()):
+        sub_text = f"SKU: {item.sku}" if item.sku else ("Custom Item" if not item.product else "")
+        row_h = 24 if sub_text else 18
+        pc.ensure(row_h + 4)
         y = pc.y
-        pc._streams.append(_line(54, y - 6, 558, y - 6, 0.80, 0.80, 0.80, 0.5))
 
-        p_name = _sanitize_text(item.display_name)[:44]
-        if item.sku:
-            p_name += f" (SKU: {item.sku})"
+        item_name = _sanitize_text(item.display_name)[:34]
+        grp_name = _sanitize_text(item.group_name)[:16]
 
-        pc._streams.append(_text_line(y, str(item.quantity), 9, 54, bold=True, r=0.0, g=0.0, b=0.0))
-        pc._streams.append(_text_line(y, p_name[:46], 9, 95, r=0.0, g=0.0, b=0.0))
-        pc._streams.append(_text_right(y, f'{item.unit_price:.2f}', 9, 460, r=0.0, g=0.0, b=0.0))
-        pc._streams.append(_text_right(y, f'{item.total_amount:.2f}', 9.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
-        pc.skip(20)
+        if sub_text:
+            pc._streams.append(_text_line(y, item_name, 8.5, 82, bold=True, r=0.0, g=0.0, b=0.0))
+            pc._streams.append(_text_line(y - 9.5, sub_text, 7.0, 82, bold=False, r=0.45, g=0.45, b=0.45))
+            mid_y = y - 4.5
+        else:
+            pc._streams.append(_text_line(y, item_name, 8.5, 82, bold=True, r=0.0, g=0.0, b=0.0))
+            mid_y = y
+
+        pc._streams.append(_text_line(mid_y, str(idx + 1), 8.5, 54, bold=True, r=0.2, g=0.2, b=0.2))
+        pc._streams.append(_text_line(mid_y, grp_name, 8.5, 270, r=0.3, g=0.3, b=0.3))
+        pc._streams.append(_text_right(mid_y, str(item.quantity), 8.5, 380, bold=True, r=0.0, g=0.0, b=0.0))
+        pc._streams.append(_text_right(mid_y, f'{item.unit_price:.2f}', 8.5, 470, r=0.1, g=0.1, b=0.1))
+        pc._streams.append(_text_right(mid_y, f'{item.total_amount:.2f}', 9, 558, bold=True, r=0.0, g=0.0, b=0.0))
+
+        # Thin dashed border for each item
+        pc._streams.append(_line(54, y - (row_h - 7), 558, y - (row_h - 7), 0.85, 0.87, 0.90, 0.5))
+        pc.skip(row_h)
+
+    # Solid closing border for the table
+    pc._streams.append(_line(54, pc.y + 6, 558, pc.y + 6, 0.0, 0.0, 0.0, 1.25))
 
     # ── Financial Totals Section (Clean Right-Aligned Layout) ──
     has_prev = bool(prev_history and prev_history.get('has_previous_orders'))
-    need_h = 110 if has_prev else 80
+    need_h = 100 if has_prev else 75
     pc.ensure(need_h)
-    pc.skip(12)
+    pc.skip(10)
     y = pc.y
     box_w = 230.0
     box_x = 558.0 - box_w
     has_due = (due_amt > 0)
 
-    # Top border for totals section
-    pc._streams.append(_line(54, y + 6, 558, y + 6, 0.0, 0.0, 0.0, 1.5))
+    # Subtotal
+    pc._streams.append(_text_line(y, 'Subtotal:', 8.5, box_x, r=0.35, g=0.35, b=0.35))
+    pc._streams.append(_text_right(y, f'BDT {sale.total_amount:.2f}', 9, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    y -= 14
 
-    # Totals breakdown on right
-    pc._streams.append(_text_line(y - 12, 'Subtotal:', 9, box_x, bold=True, r=0.0, g=0.0, b=0.0))
-    pc._streams.append(_text_right(y - 12, f'BDT {sale.total_amount:.2f}', 10, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    # Paid Amount
+    pc._streams.append(_text_line(y, 'Paid Amount:', 8.5, box_x, r=0.35, g=0.35, b=0.35))
+    pc._streams.append(_text_right(y, f'BDT {paid_amt:.2f}', 9, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    y -= 14
 
-    pc._streams.append(_text_line(y - 26, 'Paid Amount:', 9, box_x, bold=True, r=0.0, g=0.0, b=0.0))
-    pc._streams.append(_text_right(y - 26, f'BDT {paid_amt:.2f}', 10, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    # Grand Total Bar
+    pc._streams.append(_line(box_x, y + 11, 558, y + 11, 0.0, 0.0, 0.0, 1.0))
+    pc._streams.append(_text_line(y, 'Total (BDT):', 9.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_text_right(y, f'BDT {sale.total_amount:.2f}', 11, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_line(box_x, y - 6, 558, y - 6, 0.0, 0.0, 0.0, 1.0))
+    y -= 17
 
-    pc._streams.append(_line(box_x, y - 34, 558, y - 34, 0.0, 0.0, 0.0, 1.5))
-    pc._streams.append(_text_line(y - 46, 'Total (BDT):', 9.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
-    pc._streams.append(_text_right(y - 46, f'BDT {sale.total_amount:.2f}', 11, 558, bold=True, r=0.0, g=0.0, b=0.0))
-
-    curr_tot_y = y - 56
     if has_due:
-        pc._streams.append(_text_line(curr_tot_y, 'Balance Due:', 9, box_x, bold=True, r=0.0, g=0.0, b=0.0))
-        pc._streams.append(_text_right(curr_tot_y, f'BDT {due_amt:.2f}', 10, 558, bold=True, r=0.0, g=0.0, b=0.0))
-        curr_tot_y -= 12
+        pc._streams.append(_text_line(y, 'Balance Due:', 9, box_x, bold=True, r=0.0, g=0.0, b=0.0))
+        pc._streams.append(_text_right(y, f'BDT {due_amt:.2f}', 10, 558, bold=True, r=0.0, g=0.0, b=0.0))
+        y -= 14
 
     # Previous Orders Summary (single clean line)
-    pc._streams.append(_line(box_x, curr_tot_y, 558, curr_tot_y, 0.0, 0.0, 0.0, 0.5))
-    curr_tot_y -= 12
     prev_billed = float(prev_history.get('previous_total_billed', 0.0)) if prev_history else 0.0
-    pc._streams.append(_text_line(curr_tot_y, 'Previous Buy:', 8.5, box_x, bold=True, r=0.0, g=0.0, b=0.0))
-    pc._streams.append(_text_right(curr_tot_y, f'BDT {prev_billed:.2f}', 9, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    pc._streams.append(_line(box_x, y + 8, 558, y + 8, 0.85, 0.87, 0.90, 0.5))
+    pc._streams.append(_text_line(y, 'Previous Buy:', 8, box_x, bold=True, r=0.2, g=0.2, b=0.2))
+    pc._streams.append(_text_right(y, f'BDT {prev_billed:.2f}', 8.5, 558, bold=True, r=0.0, g=0.0, b=0.0))
+    y -= 10
 
-    pc._streams.append(_line(54, curr_tot_y - 6, 558, curr_tot_y - 6, 0.0, 0.0, 0.0, 1.5))
-
-    # Customer & Authorized Signatures (Pinned at absolute bottom above footer)
-    if curr_tot_y < 100:
-        pc.ensure(70)
+    # Customer & Authorized Signatures (Pinned at bottom above footer)
+    if y < 110:
+        pc.ensure(85)
     sign_y = 75
 
     pc._streams.append(_line(54, sign_y, 195, sign_y, 0.0, 0.0, 0.0, 1.0))
     pc._streams.append(_text_line(sign_y - 10, "Customer's Signature", 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
 
-    if authorized_by and hasattr(authorized_by, 'is_authenticated') and authorized_by.is_authenticated:
-        auth_name = authorized_by.get_full_name() or authorized_by.username
+    # Authorized Signature: Cursive handwriting image or fallback text
+    if sign_img_data:
+        s_w, s_h, _ = sign_img_data
+        aspect = s_w / s_h
+        display_h = 24.0
+        display_w = min(130.0, display_h * aspect)
+        sign_box_center = 417.0 + (558.0 - 417.0) / 2.0
+        sign_x = sign_box_center - display_w / 2.0
+        sign_bottom_y = sign_y + 2.0
+        pc._streams.append(f'q {display_w:.2f} 0 0 {display_h:.2f} {sign_x:.2f} {sign_bottom_y:.2f} cm /SignIm Do Q')
+    elif auth_name:
         pc._streams.append(_text_line(sign_y + 4, auth_name[:25], 9, 417, bold=True, r=0.0, g=0.0, b=0.0))
 
     pc._streams.append(_line(417, sign_y, 558, sign_y, 0.0, 0.0, 0.0, 1.0))
     pc._streams.append(_text_line(sign_y - 10, "Authorized Signature", 8, 417, bold=True, r=0.0, g=0.0, b=0.0))
+    if auth_role or (auth_name and hasattr(authorized_by, 'is_authenticated') and authorized_by.is_authenticated):
+        meta_sub = f"{auth_role} * {sold_at[:11]}" if auth_role else sold_at[:11]
+        pc._streams.append(_text_line(sign_y - 19, meta_sub, 7, 417, r=0.45, g=0.45, b=0.45))
 
     pc.finish()
     return builder.build()

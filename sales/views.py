@@ -656,7 +656,7 @@ def _get_customer_previous_history(sale):
 
 def sale_receipt_print(request, pk):
     sale = get_object_or_404(
-        Sale.objects.prefetch_related('items__product'),
+        Sale.objects.prefetch_related('items__product__group'),
         pk=pk
     )
     qr_code_b64 = _generate_qr_base64(MAPS_URL)
@@ -671,7 +671,7 @@ def sale_receipt_print(request, pk):
 
 def sale_receipt_pdf(request, pk):
     sale = get_object_or_404(
-        Sale.objects.prefetch_related('items__product'), 
+        Sale.objects.prefetch_related('items__product__group'), 
         pk=pk
     )
     prev_history = _get_customer_previous_history(sale)

@@ -267,6 +267,11 @@
             font-variant-numeric: tabular-nums;
         }
 
+        .items-table th.center,
+        .items-table td.center {
+            text-align: center;
+        }
+
         .items-table td {
             padding: 9px 6px;
             vertical-align: top;
@@ -535,16 +540,18 @@
                 <table class="items-table">
                     <thead>
                         <tr>
-                            <th style="width: 50px;">QTY</th>
+                            <th class="center" style="width: 38px;">SL</th>
                             <th>Description</th>
-                            <th class="num" style="width: 120px;">Unit Price</th>
-                            <th class="num" style="width: 130px;">Amount</th>
+                            <th style="width: 120px;">Category</th>
+                            <th class="num" style="width: 65px;">QTY</th>
+                            <th class="num" style="width: 110px;">Unit Price</th>
+                            <th class="num" style="width: 125px;">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in sale.items.all %}
                         <tr class="item-row">
-                            <td style="font-weight: 600;">{{ item.quantity }}</td>
+                            <td class="center" style="font-weight: 600;">{{ forloop.counter }}</td>
                             <td>
                                 <span class="item-title">{{ item.display_name }}</span>
                                 {% if not item.product %}
@@ -553,6 +560,8 @@
                                 <span class="item-sub">SKU: {{ item.sku }}</span>
                                 {% endif %}
                             </td>
+                            <td style="font-size: 11.5px; color: #374151; font-weight: 500;">{{ item.group_name }}</td>
+                            <td class="num" style="font-weight: 600;">{{ item.quantity }}</td>
                             <td class="num">{{ item.unit_price|floatformat:2 }}</td>
                             <td class="num" style="font-weight: 700;">{{ item.total_amount|floatformat:2 }}</td>
                         </tr>

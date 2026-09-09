@@ -126,6 +126,12 @@ class SaleItem(models.Model):
             return self.product.sku
         return ''
 
+    @property
+    def group_name(self):
+        if self.product and self.product.group:
+            return self.product.group.name
+        return '-'
+
     def save(self, *args, **kwargs):
         if self.product and not self.custom_name:
             self.custom_name = self.product.name

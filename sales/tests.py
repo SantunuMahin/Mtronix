@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from inventory.models import Inventory
 from inventory.services import InventoryService
-from products.models import Product
+from products.models import Product, ProductGroup
 from purchases.models import Purchase
 from sales.models import Sale, SaleItem
 from suppliers.models import Supplier
@@ -98,6 +98,44 @@ class SalePageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertTrue(len(response.content) > 0)
+
+    def test_sale_item_group_name_and_receipt_columns(self):
+        grp = ProductGroup.objects.create(name='Lighting')
+        self.product.group = grp
+        self.product.save()
+
+        InventoryService.add_stock(self.product, 10)
+        sale = InventoryService.create_sale(
+            customer_name='Walk-in',
+            items=[
+                {'product': self.product, 'quantity': 3, 'unit_price': '2.50'},
+                {'product': None, 'custom_name': 'Custom Wire', 'quantity': 1, 'unit_price': '15.00'},
+            ],
+        )
+        items = list(sale.items.all())
+        self.assertEqual(items[0].group_name, 'Lighting')
+        self.assertEqual(items[1].group_name, '-')
+
+        response = self.client.get(f'/sales/{sale.pk}/receipt/')
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+
+        # Check table headers exist in order: SL, Description, Category, QTY, Unit Price, Amount
+        pos_sl = content.find('>SL<')
+        pos_desc = content.find('>Description<')
+        pos_grp = content.find('>Category<')
+        pos_qty = content.find('>QTY<')
+        pos_price = content.find('>Unit Price<')
+        pos_amt = content.find('>Amount<')
+
+        self.assertTrue(pos_sl > 0 and pos_desc > 0 and pos_grp > 0 and pos_qty > 0 and pos_price > 0 and pos_amt > 0)
+        self.assertTrue(pos_sl < pos_desc < pos_grp < pos_qty < pos_price < pos_amt)
+
+        # Check rendered values
+        self.assertIn('Lighting', content)
+        self.assertIn('Custom Wire', content)
+        self.assertIn('2.50', content)
+        self.assertIn('7.50', content)
 
     def test_sales_report_pdf_view_renders_successfully(self):
         response = self.client.get('/sales/report/pdf/?period=today')
