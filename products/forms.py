@@ -22,10 +22,19 @@ class ProductForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'placeholder': 'e.g. MTX-10029 (or click Generate)'}),
         help_text="Unique SKU or Barcode identifier."
     )
+    purchase_price = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('0.00'),
+        required=False,
+        initial=Decimal('0.00'),
+        widget=forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'placeholder': '0.00'}),
+        help_text="Unit cost price from supplier (BDT)"
+    )
 
     class Meta:
         model = Product
-        fields = ['name', 'group', 'sku', 'selling_price', 'low_stock_threshold']
+        fields = ['name', 'group', 'sku', 'purchase_price', 'selling_price', 'low_stock_threshold']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'e.g. 12V 60W Power Supply'}),
             'selling_price': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'placeholder': '0.00'}),
@@ -36,9 +45,13 @@ class ProductForm(forms.ModelForm):
             'low_stock_threshold': 'Trigger low stock alert when inventory reaches this level',
         }
 
+    def clean_purchase_price(self):
+        val = self.cleaned_data.get('purchase_price')
+        return val if val is not None else Decimal('0.00')
+
     def save(self, commit=True):
         instance = super().save(commit=False)
-        if not instance.purchase_price:
+        if instance.purchase_price is None:
             instance.purchase_price = Decimal('0.00')
         if commit:
             instance.save()

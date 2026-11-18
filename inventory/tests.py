@@ -118,7 +118,7 @@ class InventoryServiceTests(TestCase):
 
 class InventoryPageTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='inv_user', password='pass')
+        self.user = User.objects.create_user(username='inv_user', password='pass', is_superuser=True)
         self.client.force_login(self.user)
         self.product = Product.objects.create(
             name='12V 100W Driver',

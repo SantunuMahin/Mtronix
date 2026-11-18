@@ -12,6 +12,9 @@
     <a class="button" href="{% url 'products:export_csv' %}" style="background: #ffffff; border: 1px solid var(--border); font-weight: 600; font-size: 13px;">
         📥 Export CSV
     </a>
+    <a class="button" href="{% url 'products:barcode_batch_print' %}" style="background: #f0fdf4; border: 1px solid #86efac; color: #166534; font-weight: 700; font-size: 13px;">
+        🏷️ Print Barcodes
+    </a>
     <a class="button primary" href="{% url 'products:create' %}" style="font-weight: 700; font-size: 13px; box-shadow: 0 4px 12px rgba(15,118,110,0.25);">
         + New Product
     </a>
@@ -230,11 +233,18 @@
                     </td>
                     <td>
                         {% if product.sku %}
-                        <span class="sku-badge" data-copy-sku="{{ product.sku }}" title="Click to copy SKU">
-                            {{ product.sku }} <span style="font-size: 10px; opacity: 0.6;">📋</span>
-                        </span>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <span class="sku-badge" data-copy-sku="{{ product.sku }}" title="Click to copy SKU">
+                                {{ product.sku }} <span style="font-size: 10px; opacity: 0.6;">📋</span>
+                            </span>
+                            <a href="{% url 'products:barcode_label' product.pk %}" style="font-size: 11px; color: #0f766e; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 3px;" title="Print Barcode Labels">
+                                <span>||| | |||||</span> Print
+                            </a>
+                        </div>
                         {% else %}
-                        <span style="color: #94a3b8;">—</span>
+                        <a href="{% url 'products:barcode_label' product.pk %}" class="button" style="padding: 2px 8px; font-size: 11px; background: #fffbeb; border-color: #fde68a; color: #92400e; font-weight: 600;">
+                            ⚡ Make Barcode
+                        </a>
                         {% endif %}
                     </td>
                     <td>
@@ -262,6 +272,9 @@
                     </td>
                     <td style="text-align: right; white-space: nowrap;">
                         <div style="display: inline-flex; gap: 6px;">
+                            <a class="button" href="{% url 'products:barcode_label' product.pk %}" style="padding: 4px 8px; font-size: 11.5px; font-weight: 700; background: #f0fdf4; border-color: #bbf7d0; color: #166534;" title="Print Barcode Stickers">
+                                🏷️ Barcode
+                            </a>
                             <a class="button" href="{% url 'inventory:add_stock' product.inventory.pk %}" style="padding: 4px 8px; font-size: 11.5px; font-weight: 600;" title="Add Stock">
                                 + Stock
                             </a>
@@ -283,5 +296,6 @@
             </tbody>
         </table>
     </div>
+    {% include 'includes/pagination.html' %}
 </section>
 {% endblock %}

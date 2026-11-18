@@ -1,20 +1,24 @@
 import calendar
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db import models
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.forms import inlineformset_factory
 from rest_framework import mixins, viewsets
 import base64
 import io
-import pytz
 
 from decimal import Decimal
 import re
 
+from accounts.decorators import management_required, sales_access_required
+from accounts.permissions import SalesRolePermission
+from config.utils import BD_TZ, get_date_range_for_period
 from inventory.services import InventoryService
 from sales.forms import SaleForm, SaleItemForm
 from sales.models import Sale, SaleItem
@@ -26,8 +30,6 @@ from sales.pdf import (
     qrcode,
 )
 from sales.serializers import SaleSerializer
-
-BD_TZ = pytz.timezone('Asia/Dhaka')
 
 
 def _generate_qr_base64(data: str) -> str:
@@ -50,6 +52,7 @@ def _generate_qr_base64(data: str) -> str:
 class SaleViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     queryset = Sale.objects.prefetch_related('items__product').order_by('-sold_at')
     serializer_class = SaleSerializer
+    permission_classes = [SalesRolePermission]
 
 
 SaleItemFormSet = inlineformset_factory(
@@ -155,6 +158,7 @@ def _build_customer_suggestions(limit=40):
     ]
 
 
+@sales_access_required
 def customer_lookup_api(request):
     """
     API for searching customer purchase history dynamically by name or phone.
@@ -169,7 +173,7 @@ def customer_lookup_api(request):
             models.Q(customer_phone__icontains=query)
         )
         .prefetch_related('items__product')
-        .order_by('-sold_at')
+        .order_by('-sold_at')[:200]
     )
 
     customers_map = {}
@@ -243,34 +247,71 @@ def customer_lookup_api(request):
     return JsonResponse({'results': results})
 
 
+@sales_access_required
+def barcode_lookup_api(request):
+    """
+    API for searching a product by barcode / SKU / ID for the POS barcode scanner.
+    Also handles looking up past invoices if an invoice barcode is scanned.
+    """
+    code = (request.GET.get('code') or request.GET.get('barcode') or '').strip()
+    if not code:
+        return JsonResponse({'found': False, 'message': 'No barcode provided'}, status=400)
+
+    # 0. Check if scanned code is an Invoice / Receipt code (e.g. SALE-00030)
+    sale_match = re.match(r'^SALE[-_]?(\d+)$', code, re.IGNORECASE)
+    if sale_match:
+        sale_id = int(sale_match.group(1))
+        matched_sale = Sale.objects.filter(pk=sale_id).prefetch_related('items__product').first()
+        if matched_sale:
+            return JsonResponse({
+                'found': True,
+                'type': 'sale',
+                'sale': {
+                    'id': matched_sale.pk,
+                    'code': f'SALE-{matched_sale.pk:05d}',
+                    'customer_name': matched_sale.customer_name or 'Walk-in Customer',
+                    'total_amount': str(matched_sale.total_amount),
+                    'payment_status': matched_sale.get_payment_status_display(),
+                    'receipt_url': reverse('sales:receipt_print', args=[matched_sale.pk]),
+                    'items_count': matched_sale.items.count(),
+                }
+            })
+
+    from products.models import Product
+
+    # 1. Exact or case-insensitive match on SKU / Barcode
+    product = Product.objects.filter(sku__iexact=code).select_related('inventory', 'group').first()
+
+    # 2. If not found and code is numeric, check by primary key ID
+    if not product and code.isdigit():
+        product = Product.objects.filter(pk=int(code)).select_related('inventory', 'group').first()
+
+    # 3. If still not found, check exact product name match (case-insensitive)
+    if not product:
+        product = Product.objects.filter(name__iexact=code).select_related('inventory', 'group').first()
+
+    if not product:
+        return JsonResponse({'found': False, 'code': code, 'message': f'Product not found for barcode: {code}'}, status=404)
+
+    stock = product.inventory.quantity if hasattr(product, 'inventory') else 0
+
+    return JsonResponse({
+        'found': True,
+        'type': 'product',
+        'product': {
+            'id': product.id,
+            'name': product.name,
+            'group': product.group.name if product.group else '',
+            'sku': product.sku or '',
+            'price': str(product.selling_price),
+            'stock': stock,
+        }
+    })
+
+
 def _get_date_range_for_period(period):
     """Calculate start/end dates and label for a given period in BD time."""
-    now = timezone.now().astimezone(BD_TZ)
-    midnight = {'hour': 0, 'minute': 0, 'second': 0, 'microsecond': 0}
-    end_of_day = {'hour': 23, 'minute': 59, 'second': 59, 'microsecond': 999999}
-
-    if period == "today":
-        start = now.replace(**midnight)
-        end = now.replace(**end_of_day)
-        label = f"Today ({start.strftime('%b %d, %Y')})"
-
-    elif period == "month":
-        start = now.replace(day=1, **midnight)
-        last_day = calendar.monthrange(now.year, now.month)[1]
-        end = now.replace(day=last_day, **end_of_day)
-        label = f"This Month ({start.strftime('%B %Y')})"
-
-    elif period == "year":
-        start = now.replace(month=1, day=1, **midnight)
-        end = now.replace(month=12, day=31, **end_of_day)
-        label = f"This Year ({start.strftime('%Y')})"
-
-    else:
-        start = now.replace(**midnight)
-        end = now.replace(**end_of_day)
-        label = f"Today ({start.strftime('%b %d, %Y')})"
-
-    return start, end, label
+    return get_date_range_for_period(period, default_period='today')
 
 
 def _serialize_product_sales_data(items):
@@ -416,6 +457,7 @@ def _build_customer_statement_data(request):
 
 # ─── Views ──────────────────────────────────────────────────
 
+@sales_access_required
 def sale_list(request):
     query = request.GET.get('q', '').strip()
     status_filter = request.GET.get('status', 'all').lower()
@@ -502,8 +544,16 @@ def sale_list(request):
     if receipt_pk:
         receipt_sale = Sale.objects.filter(pk=receipt_pk).first()
 
+    total_sales_revenue = sum((s.total_amount for s in all_current_sales), Decimal('0.00'))
+    total_sales_paid = sum((s.effective_paid_amount for s in all_current_sales), Decimal('0.00'))
+    total_sales_due = sum((s.due_amount for s in all_current_sales), Decimal('0.00'))
+
+    paginator = Paginator(all_current_sales, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     return render(request, 'sales/list.html', {
-        'sales': all_current_sales,
+        'sales': page_obj.object_list,
+        'page_obj': page_obj,
         'query': query,
         'status_filter': status_filter,
         'period': period,
@@ -512,10 +562,14 @@ def sale_list(request):
         'count_paid': count_paid,
         'count_partial': count_partial,
         'count_unpaid': count_unpaid,
+        'total_sales_revenue': total_sales_revenue,
+        'total_sales_paid': total_sales_paid,
+        'total_sales_due': total_sales_due,
         'receipt_sale': receipt_sale,
     })
 
 
+@sales_access_required
 def sale_create(request):
     form = SaleForm(request.POST or None)
     formset = SaleItemFormSet(request.POST or None, instance=Sale())
@@ -554,6 +608,8 @@ def sale_create(request):
     })
 
 
+@sales_access_required
+@require_POST
 def sale_toggle_payment_status(request, pk):
     sale = get_object_or_404(Sale, pk=pk)
     if sale.payment_status == 'PAID':
@@ -571,6 +627,35 @@ def sale_toggle_payment_status(request, pk):
     sale.save(update_fields=['payment_status', 'paid_amount'])
     messages.success(request, f'Sale #{sale.pk} marked as {sale.get_payment_status_display()}.')
     next_url = request.POST.get('next') or request.GET.get('next') or reverse('sales:list')
+    return redirect(next_url)
+
+
+@sales_access_required
+@require_POST
+def sale_record_payment(request, pk):
+    sale = get_object_or_404(Sale, pk=pk)
+    raw_amount = request.POST.get('amount', '').strip()
+    try:
+        InventoryService.record_payment(sale, raw_amount)
+        sale.refresh_from_db()
+        messages.success(
+            request,
+            f'Payment recorded for Sale #{sale.pk}. Status: {sale.get_payment_status_display()} (Due: BDT {sale.due_amount:.2f}).',
+        )
+    except (ValueError, Exception) as exc:
+        messages.error(request, f'Could not record payment: {exc}')
+    next_url = request.POST.get('next') or reverse('sales:list')
+    return redirect(next_url)
+
+
+@management_required
+@require_POST
+def sale_cancel(request, pk):
+    sale = get_object_or_404(Sale, pk=pk)
+    sale_id = sale.pk
+    InventoryService.cancel_sale(sale, user=request.user)
+    messages.success(request, f'Sale #{sale_id} cancelled and stock restored.')
+    next_url = request.POST.get('next') or reverse('sales:list')
     return redirect(next_url)
 
 
@@ -654,6 +739,7 @@ def _get_customer_previous_history(sale):
     }
 
 
+@sales_access_required
 def sale_receipt_print(request, pk):
     sale = get_object_or_404(
         Sale.objects.prefetch_related('items__product__group'),
@@ -661,14 +747,22 @@ def sale_receipt_print(request, pk):
     )
     qr_code_b64 = _generate_qr_base64(MAPS_URL)
     prev_history = _get_customer_previous_history(sale)
+
+    from products.barcode import generate_code128_svg
+    barcode_code = f"SALE-{sale.pk:05d}"
+    barcode_svg = generate_code128_svg(barcode_code, height=32, show_text=False)
+
     return render(request, 'sales/receipt.html', {
         'sale': sale,
         'qr_code_b64': qr_code_b64,
         'prev_history': prev_history,
         'authorized_by': request.user,
+        'barcode_svg': barcode_svg,
+        'barcode_code': barcode_code,
     })
 
 
+@sales_access_required
 def sale_receipt_pdf(request, pk):
     sale = get_object_or_404(
         Sale.objects.prefetch_related('items__product__group'), 
@@ -683,12 +777,14 @@ def sale_receipt_pdf(request, pk):
     return response
 
 
+@sales_access_required
 def customer_statement_view(request):
     """View customer statement in HTML with options to filter or print/export."""
     data = _build_customer_statement_data(request)
     return render(request, 'sales/customer_statement.html', data)
 
 
+@sales_access_required
 def customer_statement_pdf(request):
     """Download consolidated customer statement PDF for all/selective paid/unpaid items."""
     data = _build_customer_statement_data(request)
@@ -699,17 +795,17 @@ def customer_statement_pdf(request):
     return response
 
 
+@sales_access_required
 def sales_report_pdf(request):
     period = request.GET.get("period", "today")
     start_date, end_date, period_label = _get_date_range_for_period(period)
 
     # Base querysets
-    sales_qs = Sale.objects.filter(sold_at__range=(start_date, end_date)).prefetch_related("items")
-    items_qs = (
-        SaleItem.objects
-        .filter(sale__sold_at__range=(start_date, end_date))
-        .select_related("product")
-    )
+    sales_qs = Sale.objects.prefetch_related("items")
+    items_qs = SaleItem.objects.select_related("product")
+    if start_date and end_date:
+        sales_qs = sales_qs.filter(sold_at__range=(start_date, end_date))
+        items_qs = items_qs.filter(sale__sold_at__range=(start_date, end_date))
 
     # Summary metrics
     sales_list = list(sales_qs)

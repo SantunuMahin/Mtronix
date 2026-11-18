@@ -690,24 +690,8 @@ def build_sale_receipt_pdf(sale, prev_history=None, authorized_by=None) -> bytes
     pc._streams.append(_line(54, sign_y, 195, sign_y, 0.0, 0.0, 0.0, 1.0))
     pc._streams.append(_text_line(sign_y - 10, "Customer's Signature", 8, 54, bold=True, r=0.0, g=0.0, b=0.0))
 
-    # Authorized Signature: Cursive handwriting image or fallback text
-    if sign_img_data:
-        s_w, s_h, _ = sign_img_data
-        aspect = s_w / s_h
-        display_h = 24.0
-        display_w = min(130.0, display_h * aspect)
-        sign_box_center = 417.0 + (558.0 - 417.0) / 2.0
-        sign_x = sign_box_center - display_w / 2.0
-        sign_bottom_y = sign_y + 2.0
-        pc._streams.append(f'q {display_w:.2f} 0 0 {display_h:.2f} {sign_x:.2f} {sign_bottom_y:.2f} cm /SignIm Do Q')
-    elif auth_name:
-        pc._streams.append(_text_line(sign_y + 4, auth_name[:25], 9, 417, bold=True, r=0.0, g=0.0, b=0.0))
-
     pc._streams.append(_line(417, sign_y, 558, sign_y, 0.0, 0.0, 0.0, 1.0))
     pc._streams.append(_text_line(sign_y - 10, "Authorized Signature", 8, 417, bold=True, r=0.0, g=0.0, b=0.0))
-    if auth_role or (auth_name and hasattr(authorized_by, 'is_authenticated') and authorized_by.is_authenticated):
-        meta_sub = f"{auth_role} * {sold_at[:11]}" if auth_role else sold_at[:11]
-        pc._streams.append(_text_line(sign_y - 19, meta_sub, 7, 417, r=0.45, g=0.45, b=0.45))
 
     pc.finish()
     return builder.build()

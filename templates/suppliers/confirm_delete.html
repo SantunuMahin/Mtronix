@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Supplier - Mtronix{% endblock %}
+{% block page_title %}Delete Supplier{% endblock %}
+{% block page_subtitle %}Confirm permanent removal of "{{ supplier.name }}".{% endblock %}
+
+{% block content %}
+<div style="max-width: 520px; margin: 0 auto;">
+    <section class="panel" style="border-radius: 14px; padding: 28px;">
+        <p style="margin-top: 0; color: #334155;">
+            Are you sure you want to delete supplier <strong>{{ supplier.name }}</strong> ({{ supplier.phone }})?
+        </p>
+        <p style="font-size: 13px; color: #64748b;">
+            Suppliers with linked purchase history cannot be deleted to preserve audit records.
+        </p>
+        <form method="post" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px;">
+            {% csrf_token %}
+            <a class="button" href="{% url 'suppliers:list' %}">Cancel</a>
+            <button type="submit" class="button" style="background: #dc2626; color: #ffffff; border-color: #dc2626; font-weight: 700;">Delete Supplier</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

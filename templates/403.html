@@ -19,7 +19,10 @@
         </p>
         <div class="access-denied-actions">
             <a href="{% url 'dashboard' %}" class="button">← Back to Dashboard</a>
-            <a href="{% url 'accounts:logout' %}" class="button button-outline">Sign Out</a>
+            <form method="post" action="{% url 'accounts:logout' %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="button button-outline" style="cursor: pointer;">Sign Out</button>
+            </form>
         </div>
     </div>
 </section>

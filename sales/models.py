@@ -21,14 +21,15 @@ class PaymentStatus(models.TextChoices):
 
 
 class Sale(models.Model):
-    customer_name = models.CharField(max_length=200, blank=True)
-    customer_phone = models.CharField(max_length=50, blank=True)
+    customer_name = models.CharField(max_length=200, blank=True, db_index=True)
+    customer_phone = models.CharField(max_length=50, blank=True, db_index=True)
     customer_address = models.TextField(blank=True)
     payment_status = models.CharField(
         max_length=10,
         choices=PaymentStatus.choices,
         default=PaymentStatus.PAID,
         blank=True,
+        db_index=True,
     )
     paid_amount = models.DecimalField(
         max_digits=12,
@@ -37,7 +38,7 @@ class Sale(models.Model):
         validators=[MinValueValidator(0)],
         blank=True,
     )
-    sold_at = models.DateTimeField(default=bd_now)
+    sold_at = models.DateTimeField(default=bd_now, db_index=True)
 
     class Meta:
         ordering = ['-sold_at']

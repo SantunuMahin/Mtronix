@@ -1,4 +1,10 @@
-from accounts.models import UserProfile
+from accounts.decorators import (
+    ADMIN_ROLES,
+    INVENTORY_WRITE_ROLES,
+    MANAGEMENT_ROLES,
+    SALES_ROLES,
+    has_any_role,
+)
 
 
 def rbac_flags(request):
@@ -6,30 +12,34 @@ def rbac_flags(request):
     Injects role-based access flags into every template context.
 
     Flags:
-        rbac_is_privileged  – True for SYSTEM_OWNER, sales role, or superuser.
-                              These users can access every section including sales.
-        rbac_can_access     – True for privileged users OR staff users (admin login).
-                              These users can access products/inventory/sales.
+        rbac_is_admin         – SYSTEM_OWNER, ADMIN, or superuser.
+        rbac_is_management    – SYSTEM_OWNER, ADMIN, MANAGER, or superuser.
+        rbac_can_access_sales – SYSTEM_OWNER, ADMIN, MANAGER, SALES, or superuser.
+        rbac_can_manage_stock – SYSTEM_OWNER, ADMIN, MANAGER, STOREKEEPER, or superuser.
+        rbac_is_privileged    – Alias for rbac_can_access_sales.
+        rbac_can_access       – Alias for rbac_can_manage_stock.
     """
-    if not request.user.is_authenticated:
+    user = request.user
+    if not user.is_authenticated:
         return {
+            'rbac_is_admin': False,
+            'rbac_is_management': False,
+            'rbac_can_access_sales': False,
+            'rbac_can_manage_stock': False,
             'rbac_is_privileged': False,
             'rbac_can_access': False,
         }
 
-    is_superuser = request.user.is_superuser
-    is_staff = request.user.is_staff
-
-    role = None
-    try:
-        role = request.user.profile.role
-    except (UserProfile.DoesNotExist, AttributeError):
-        pass
-
-    is_privileged = is_superuser or role in (UserProfile.SYSTEMOWNER, UserProfile.SALES)
-    can_access = is_privileged or is_staff
+    is_admin = has_any_role(user, ADMIN_ROLES)
+    is_management = has_any_role(user, MANAGEMENT_ROLES)
+    can_access_sales = has_any_role(user, SALES_ROLES)
+    can_manage_stock = has_any_role(user, INVENTORY_WRITE_ROLES)
 
     return {
-        'rbac_is_privileged': is_privileged,
-        'rbac_can_access': can_access,
+        'rbac_is_admin': is_admin,
+        'rbac_is_management': is_management,
+        'rbac_can_access_sales': can_access_sales,
+        'rbac_can_manage_stock': can_manage_stock,
+        'rbac_is_privileged': can_access_sales,
+        'rbac_can_access': can_manage_stock,
     }

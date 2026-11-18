@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Staff & Roles - Mtronix{% endblock %}
+{% block page_title %}Staff &amp; Role Administration{% endblock %}
+{% block page_subtitle %}Create staff accounts, assign operational roles, and control access across Mtronix.{% endblock %}
+
+{% block content %}
+<div class="kpi-grid">
+    <div class="kpi-card teal">
+        <div class="kpi-label">Total Accounts</div>
+        <div class="kpi-value">{{ users|length }}</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 20px; align-items: start;">
+    <!-- Create Staff User Card -->
+    <section class="panel" style="padding: 22px; border-radius: 14px;">
+        <h3 style="margin: 0 0 14px; font-size: 15px; font-weight: 700;">+ Add Staff Account</h3>
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div style="display: grid; gap: 12px;">
+                <label class="field">
+                    <span>Username <strong style="color: #dc2626;">*</strong></span>
+                    <input type="text" name="username" required placeholder="e.g. rahim_sales" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>Full Name</span>
+                    <input type="text" name="full_name" placeholder="e.g. Rahim Uddin">
+                </label>
+                <label class="field">
+                    <span>Email</span>
+                    <input type="email" name="email" placeholder="optional@mtronix.local">
+                </label>
+                <label class="field">
+                    <span>Password <strong style="color: #dc2626;">*</strong></span>
+                    <input type="password" name="password" required placeholder="Minimum 6 characters">
+                </label>
+                <label class="field">
+                    <span>Role <strong style="color: #dc2626;">*</strong></span>
+                    <select name="role">
+                        {% for val, label in role_choices %}
+                        <option value="{{ val }}" {% if val == 'sales' %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button type="submit" class="button primary" style="font-weight: 700; margin-top: 4px;">Create Staff User</button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Staff Table -->
+    <section class="panel" style="padding: 0; overflow: hidden;">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>
+                            <strong>{{ u.get_full_name|default:u.username }}</strong>
+                            <div style="font-size: 12px; color: #64748b;">
+                                @{{ u.username }}
+                                {% if u.is_superuser %}<span class="badge" style="margin-left: 4px; background: #fef3c7; color: #92400e;">Superuser</span>{% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <form method="post" action="{% url 'accounts:user_role' u.pk %}" style="display: inline-flex; gap: 6px; align-items: center;">
+                                {% csrf_token %}
+                                <select name="role" style="min-height: 32px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px;">
+                                    {% for val, label in role_choices %}
+                                    <option value="{{ val }}" {% if u.profile.role == val %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="button" style="min-height: 30px; padding: 3px 10px; font-size: 12px;">Save</button>
+                            </form>
+                        </td>
+                        <td>
+                            {% if u.is_active %}
+                            <span class="badge" style="background: #d1fae5; color: #047857; border: 1px solid #a7f3d0;">Active</span>
+                            {% else %}
+                            <span class="badge" style="background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;">Disabled</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right;">
+                            {% if u.pk != request.user.pk %}
+                            <form method="post" action="{% url 'accounts:user_toggle_active' u.pk %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="button" style="min-height: 30px; padding: 3px 10px; font-size: 12px;">
+                                    {% if u.is_active %}Disable{% else %}Enable{% endif %}
+                                </button>
+                            </form>
+                            {% else %}
+                            <span style="font-size: 12px; color: #64748b;">Current User</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

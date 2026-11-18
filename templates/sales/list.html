@@ -175,7 +175,121 @@
     border: 1px solid #a7f3d0;
     box-shadow: 0 4px 12px rgba(16,185,129,0.12);
 }
+
+/* ─── Invoice Barcode Scanner & Table Polish ─── */
+.invoice-scanner-card {
+    background: linear-gradient(135deg, #f8fafc, #f0fdfa);
+    border: 1px solid #99f6e4;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+}
+.invoice-scanner-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.invoice-scanner-input {
+    flex: 1;
+    min-width: 220px;
+    min-height: 38px;
+    padding: 7px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    background: #ffffff;
+}
+.invoice-scanner-input:focus {
+    outline: none;
+    border-color: #0f766e;
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+.sale-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 11px;
+    line-height: 1.2;
+}
+.btn-xs {
+    min-height: 28px !important;
+    padding: 3px 9px !important;
+    font-size: 11.5px !important;
+    line-height: 1.2 !important;
+}
+.sales-actions-cell {
+    display: flex;
+    gap: 5px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    max-width: 230px;
+    margin-left: auto;
+}
 </style>
+
+<!-- ── Sales KPI Summary Strip ── -->
+<div class="kpi-grid">
+    <div class="kpi-card blue">
+        <div class="kpi-label">Filtered Orders</div>
+        <div class="kpi-value">{{ count_all }}</div>
+    </div>
+    <div class="kpi-card teal">
+        <div class="kpi-label">Total Billed</div>
+        <div class="kpi-value" style="color: #0f766e;">BDT {{ total_sales_revenue|floatformat:2 }}</div>
+    </div>
+    <div class="kpi-card emerald">
+        <div class="kpi-label">Collected (Paid)</div>
+        <div class="kpi-value" style="color: #047857;">BDT {{ total_sales_paid|floatformat:2 }}</div>
+    </div>
+    <div class="kpi-card {% if total_sales_due > 0 %}rose{% else %}emerald{% endif %}">
+        <div class="kpi-label">Outstanding Due</div>
+        <div class="kpi-value" style="color: {% if total_sales_due > 0 %}#dc2626{% else %}#047857{% endif %};">BDT {{ total_sales_due|floatformat:2 }}</div>
+    </div>
+</div>
+
+<!-- ── Invoice Barcode Scanner Strip ── -->
+<section class="invoice-scanner-card">
+    <div class="invoice-scanner-row">
+        <span style="font-size: 13px; font-weight: 700; color: #0f766e; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+            🧾 Invoice Scanner
+        </span>
+        <input
+            type="text"
+            id="invoice-barcode-input"
+            class="invoice-scanner-input"
+            placeholder="Scan invoice barcode (e.g. SALE-00037) or enter Sale #ID..."
+            autocomplete="off"
+        >
+        <button type="button" id="btn-invoice-lookup" class="button primary" style="min-height: 38px; padding: 0 14px; font-weight: 700; font-size: 13px;">
+            Find Invoice
+        </button>
+        <button type="button" id="btn-invoice-camera" class="button" style="min-height: 38px; padding: 0 12px; font-size: 13px; font-weight: 600; background: #ffffff;">
+            📷 Camera Scan
+        </button>
+        <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer; white-space: nowrap;">
+            <input type="checkbox" id="chk-auto-open-receipt"> Auto-open receipt
+        </label>
+    </div>
+    <div id="invoice-scan-result" style="display: none; margin-top: 10px; padding: 10px 14px; border-radius: 8px; background: #ffffff; border: 1px solid #cbd5e1;"></div>
+</section>
+
+<!-- Camera Scanner Modal for Invoices -->
+<div id="invoice-camera-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); z-index: 9999; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #ffffff; border-radius: 14px; max-width: 440px; width: 100%; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <strong style="font-size: 15px; color: #0f172a;">📷 Scan Invoice Barcode</strong>
+            <button type="button" id="btn-close-invoice-camera" class="button btn-xs">✕ Close</button>
+        </div>
+        <div id="invoice-camera-reader" style="width: 100%; border-radius: 8px; overflow: hidden; background: #0f172a; min-height: 220px;"></div>
+        <p id="invoice-camera-status" style="margin: 10px 0 0; font-size: 12px; color: #64748b; text-align: center;">Point camera at the SALE-XXXXX barcode on any invoice.</p>
+    </div>
+</div>
 
 <!-- ── Period Selector Filter Tabs (Timeline View) ── -->
 <div class="sales-period-nav">
@@ -335,22 +449,22 @@
                             {% endfor %}
                         </div>
                     </td>
-                    <td>
-                        <strong style="font-size: 14.5px; color: #0f172a;">BDT {{ sale.total_amount|floatformat:2 }}</strong>
+                    <td style="white-space: nowrap;">
+                        <strong style="font-size: 14px; color: #0f172a;">BDT {{ sale.total_amount|floatformat:2 }}</strong>
                     </td>
                     <td>
                         <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                 {% if sale.is_paid %}
-                                <span class="badge" style="background: #d1fae5; color: #047857; border: 1px solid #a7f3d0; font-weight: 700; font-size: 11px;">
+                                <span class="sale-status-badge" style="background: #d1fae5; color: #047857; border: 1px solid #a7f3d0;">
                                     ✓ PAID
                                 </span>
                                 {% elif sale.is_partial %}
-                                <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 11px;">
+                                <span class="sale-status-badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a;">
                                     🌓 PARTIAL
                                 </span>
                                 {% else %}
-                                <span class="badge" style="background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700; font-size: 11px;">
+                                <span class="sale-status-badge" style="background: #fee2e2; color: #dc2626; border: 1px solid #fecaca;">
                                     ⏳ UNPAID
                                 </span>
                                 {% endif %}
@@ -358,27 +472,42 @@
                                 <form method="post" action="{% url 'sales:toggle_status' sale.pk %}" style="display: inline;">
                                     {% csrf_token %}
                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <button type="submit" class="button" style="padding: 2px 7px; font-size: 10.5px; font-weight: 600;" title="Quick Toggle Status">
+                                    <button type="submit" class="button btn-xs" style="font-weight: 600;" title="Quick Toggle Status">
                                         {% if sale.is_paid %}Mark Unpaid{% else %}Mark Paid{% endif %}
                                     </button>
                                 </form>
                             </div>
                             {% if sale.is_partial %}
-                            <div style="font-size: 11px; color: #64748b; line-height: 1.2;">
+                            <div style="font-size: 11px; color: #64748b; line-height: 1.2; white-space: nowrap;">
                                 <span>Paid: <strong style="color: #047857;">BDT {{ sale.effective_paid_amount|floatformat:2 }}</strong></span>
                                 <span style="margin: 0 2px;">&bull;</span>
                                 <span>Due: <strong style="color: #dc2626;">BDT {{ sale.due_amount|floatformat:2 }}</strong></span>
                             </div>
                             {% endif %}
+                            {% if not sale.is_paid %}
+                            <form method="post" action="{% url 'sales:record_payment' sale.pk %}" style="display: inline-flex; gap: 4px; align-items: center; margin-top: 2px;">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <input type="number" name="amount" step="0.01" min="0.01" max="{{ sale.due_amount }}" placeholder="Pay due..." required style="width: 78px; padding: 3px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px; min-height: 26px;">
+                                <button type="submit" class="button btn-xs" style="font-weight: 700; background: #ecfdf5; border-color: #a7f3d0; color: #065f46;">+ Pay</button>
+                            </form>
+                            {% endif %}
                         </div>
                     </td>
-                    <td style="text-align: right; white-space: nowrap;">
-                        <div style="display: inline-flex; gap: 5px; justify-content: flex-end;">
-                            <button type="button" class="button primary" onclick="printReceipt('{% url 'sales:receipt_print' sale.pk %}')" title="Print directly to printer" style="padding: 5px 9px; font-size: 12px; font-weight: 700;">🖨️</button>
-                            <a class="button" href="{% url 'sales:receipt_print' sale.pk %}" target="_blank" title="View A4 invoice" style="padding: 5px 9px; font-size: 12px; font-weight: 600; background: #ffffff;">Receipt</a>
-                            <a class="button" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" title="Download PDF invoice" style="padding: 5px 9px; font-size: 12px; font-weight: 600; background: #ffffff;">PDF</a>
+                    <td style="text-align: right;">
+                        <div class="sales-actions-cell">
+                            <button type="button" class="button primary btn-xs" onclick="printReceipt('{% url 'sales:receipt_print' sale.pk %}')" title="Print directly to printer" style="font-weight: 700;">🖨️</button>
+                            <a class="button btn-xs" href="{% url 'sales:receipt_print' sale.pk %}" target="_blank" title="View A4 invoice" style="font-weight: 600; background: #ffffff;">Receipt</a>
+                            <a class="button btn-xs" href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" title="Download PDF invoice" style="font-weight: 600; background: #ffffff;">PDF</a>
                             {% if sale.customer_name %}
-                            <a class="button" href="{% url 'sales:customer_statement' %}?customer={{ sale.customer_name|urlencode }}" target="_blank" title="Customer account ledger" style="padding: 5px 9px; font-size: 12px; font-weight: 600; background: #f8fafc;">Ledger</a>
+                            <a class="button btn-xs" href="{% url 'sales:customer_statement' %}?customer={{ sale.customer_name|urlencode }}" target="_blank" title="Customer account ledger" style="font-weight: 600; background: #f8fafc;">Ledger</a>
+                            {% endif %}
+                            {% if rbac_is_management %}
+                            <form method="post" action="{% url 'sales:cancel' sale.pk %}" style="display: inline;" onsubmit="return confirm('Cancel Sale #{{ sale.pk }} and restore item stock?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="button btn-xs" title="Cancel sale &amp; restore stock" style="font-weight: 600; color: #dc2626; border-color: #fecaca; background: #fef2f2;">Cancel</button>
+                            </form>
                             {% endif %}
                         </div>
                     </td>
@@ -396,6 +525,7 @@
             </tbody>
         </table>
     </div>
+    {% include 'includes/pagination.html' %}
 </section>
 
 <!-- Direct Print & Batch Scripts -->
@@ -475,5 +605,120 @@
         printReceipt("{% url 'sales:receipt_print' receipt_sale.pk %}");
     });
     {% endif %}
+</script>
+{% load static %}
+<script src="{% static 'js/html5-qrcode.min.js' %}?v=3.0.0"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const scanInput = document.getElementById('invoice-barcode-input');
+    const lookupBtn = document.getElementById('btn-invoice-lookup');
+    const resultBox = document.getElementById('invoice-scan-result');
+    const autoOpenChk = document.getElementById('chk-auto-open-receipt');
+    const camBtn = document.getElementById('btn-invoice-camera');
+    const camModal = document.getElementById('invoice-camera-modal');
+    const camCloseBtn = document.getElementById('btn-close-invoice-camera');
+    const camStatus = document.getElementById('invoice-camera-status');
+    let qrScanner = null;
+
+    async function lookupInvoice(rawCode) {
+        let code = (rawCode || '').trim();
+        if (!code) return;
+        if (/^\d+$/.test(code)) {
+            code = `SALE-${code}`;
+        }
+
+        try {
+            const resp = await fetch(`/sales/barcode-lookup/?code=${encodeURIComponent(code)}`);
+            const data = await resp.json();
+            if (resp.ok && data.found && data.type === 'sale') {
+                const s = data.sale;
+                resultBox.style.display = 'block';
+                resultBox.style.background = '#ecfdf5';
+                resultBox.style.borderColor = '#a7f3d0';
+                resultBox.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <div>
+                            <strong style="color: #065f46; font-size: 14px;">${s.code}</strong>
+                            <span style="margin: 0 6px; color: #94a3b8;">&bull;</span>
+                            <strong style="color: #0f172a;">${s.customer_name}</strong>
+                            <span style="margin: 0 6px; color: #94a3b8;">&bull;</span>
+                            <strong style="color: #0f766e;">BDT ${parseFloat(s.total_amount).toFixed(2)}</strong>
+                            <span class="sale-status-badge" style="margin-left: 6px; background: #ffffff; border: 1px solid #a7f3d0; color: #065f46;">${s.payment_status}</span>
+                        </div>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <button type="button" class="button primary btn-xs" onclick="printReceipt('${s.receipt_url}')">🖨️ Print</button>
+                            <a class="button btn-xs" href="${s.receipt_url}" target="_blank">Open Receipt</a>
+                            <a class="button btn-xs" href="/sales/${s.id}/receipt.pdf" target="_blank">PDF</a>
+                            <a class="button btn-xs" href="?q=${s.id}">Filter Table</a>
+                        </div>
+                    </div>
+                `;
+                if (autoOpenChk && autoOpenChk.checked) {
+                    window.open(s.receipt_url, '_blank');
+                }
+            } else {
+                resultBox.style.display = 'block';
+                resultBox.style.background = '#fef2f2';
+                resultBox.style.borderColor = '#fecaca';
+                resultBox.innerHTML = `<span style="color: #991b1b; font-size: 13px; font-weight: 600;">No invoice found for "${rawCode}". Try scanning a SALE-XXXXX barcode or entering the Sale ID.</span>`;
+            }
+        } catch (err) {
+            resultBox.style.display = 'block';
+            resultBox.style.background = '#fef2f2';
+            resultBox.style.borderColor = '#fecaca';
+            resultBox.innerHTML = `<span style="color: #991b1b; font-size: 13px; font-weight: 600;">Could not look up invoice right now.</span>`;
+        }
+    }
+
+    if (lookupBtn && scanInput) {
+        lookupBtn.addEventListener('click', () => lookupInvoice(scanInput.value));
+        scanInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                lookupInvoice(scanInput.value);
+            }
+        });
+    }
+
+    async function stopCam() {
+        if (qrScanner) {
+            try { await qrScanner.stop(); } catch (e) {}
+            try { qrScanner.clear(); } catch (e) {}
+            qrScanner = null;
+        }
+        if (camModal) camModal.style.display = 'none';
+    }
+
+    if (camBtn && camModal) {
+        camBtn.addEventListener('click', async () => {
+            if (typeof Html5Qrcode === 'undefined') {
+                if (typeof showToast === 'function') showToast('Camera scanner library not loaded.', 'error');
+                return;
+            }
+            camModal.style.display = 'flex';
+            camStatus.textContent = 'Starting camera...';
+            try {
+                qrScanner = new Html5Qrcode('invoice-camera-reader');
+                await qrScanner.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 260, height: 140 } },
+                    (decodedText) => {
+                        if (scanInput) scanInput.value = decodedText;
+                        stopCam();
+                        lookupInvoice(decodedText);
+                    },
+                    () => {}
+                );
+                camStatus.textContent = 'Point camera at the SALE-XXXXX barcode on any invoice.';
+            } catch (err) {
+                camStatus.textContent = 'Unable to access camera. Please check browser permissions.';
+            }
+        });
+    }
+
+    if (camCloseBtn) {
+        camCloseBtn.addEventListener('click', stopCam);
+    }
+});
 </script>
 {% endblock %}

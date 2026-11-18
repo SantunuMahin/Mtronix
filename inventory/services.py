@@ -103,6 +103,9 @@ class InventoryService:
             quantity=quantity,
             unit_price=unit_price,
         )
+        if unit_price is not None and Decimal(str(unit_price)) > Decimal('0.00'):
+            product.purchase_price = Decimal(str(unit_price))
+            product.save(update_fields=['purchase_price', 'updated_at'])
         supplier_name = supplier.name if supplier else 'Supplier'
         InventoryService.add_stock(
             product=product,
@@ -162,3 +165,46 @@ class InventoryService:
             sale.save(update_fields=['payment_status', 'paid_amount'])
 
         return sale
+
+    @staticmethod
+    @transaction.atomic
+    def record_payment(sale, amount):
+        """Record an incremental payment against an UNPAID or PARTIAL sale."""
+        amt = Decimal(str(amount or 0))
+        if amt <= Decimal('0.00'):
+            raise ValueError('Payment amount must be greater than zero')
+
+        sale = Sale.objects.select_for_update().get(pk=sale.pk)
+        tot = sale.total_amount
+        current_paid = sale.effective_paid_amount
+        new_paid = min(tot, current_paid + amt)
+
+        if new_paid >= tot and tot > Decimal('0.00'):
+            sale.payment_status = 'PAID'
+            sale.paid_amount = tot
+        elif new_paid > Decimal('0.00'):
+            sale.payment_status = 'PARTIAL'
+            sale.paid_amount = new_paid
+        else:
+            sale.payment_status = 'UNPAID'
+            sale.paid_amount = Decimal('0.00')
+
+        sale.save(update_fields=['payment_status', 'paid_amount'])
+        return sale
+
+    @staticmethod
+    @transaction.atomic
+    def cancel_sale(sale, user=None, reason='Sale Cancelled / Returned'):
+        """Cancel a sale, restore stock for catalog items, and log StockMovement reversals."""
+        sale = Sale.objects.select_for_update().prefetch_related('items__product').get(pk=sale.pk)
+        sale_code = f'SALE-{sale.pk:05d}'
+        for item in sale.items.all():
+            if item.product:
+                InventoryService.add_stock(
+                    product=item.product,
+                    qty=item.quantity,
+                    user=user,
+                    reason=f'{reason} ({sale_code})',
+                    movement_type=StockMovement.MOVEMENT_ADD,
+                )
+        sale.delete()

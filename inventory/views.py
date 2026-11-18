@@ -2,18 +2,20 @@ import calendar
 import datetime
 from decimal import Decimal
 import json
+from django.core.paginator import Paginator
 from django.db import models
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from rest_framework import viewsets
-import pytz
 
+from accounts.decorators import inventory_write_required, management_required
+from accounts.permissions import ManagementWritePermission
+from config.utils import BD_TZ, get_date_range_for_period
 from inventory.forms import StockAdjustmentForm
 from inventory.models import Inventory, StockMovement
 from inventory.pdf import (
-    BD_TZ,
     build_inventory_stock_pdf,
     build_new_products_pdf,
     build_stock_updates_pdf,
@@ -25,33 +27,7 @@ from sales.models import Sale, SaleItem
 
 
 def _get_date_range_for_period(period):
-    now = timezone.now().astimezone(BD_TZ)
-    midnight = {'hour': 0, 'minute': 0, 'second': 0, 'microsecond': 0}
-    end_of_day = {'hour': 23, 'minute': 59, 'second': 59, 'microsecond': 999999}
-
-    if period == "today":
-        start = now.replace(**midnight)
-        end = now.replace(**end_of_day)
-        label = f"Today ({start.strftime('%b %d, %Y')})"
-    elif period == "week":
-        start = (now - datetime.timedelta(days=now.weekday())).replace(**midnight)
-        end = now.replace(**end_of_day)
-        label = f"This Week ({start.strftime('%b %d')} - {end.strftime('%b %d, %Y')})"
-    elif period == "month":
-        start = now.replace(day=1, **midnight)
-        last_day = calendar.monthrange(now.year, now.month)[1]
-        end = now.replace(day=last_day, **end_of_day)
-        label = f"This Month ({start.strftime('%B %Y')})"
-    elif period == "year":
-        start = now.replace(month=1, day=1, **midnight)
-        end = now.replace(month=12, day=31, **end_of_day)
-        label = f"This Year ({start.strftime('%Y')})"
-    else:
-        start = None
-        end = None
-        label = "All Time"
-
-    return start, end, label
+    return get_date_range_for_period(period, default_period='all')
 
 
 def _build_chart_trend_data(period, sales_qs):
@@ -164,6 +140,7 @@ def _build_chart_trend_data(period, sales_qs):
 class InventoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Inventory.objects.select_related('product').order_by('product__name')
     serializer_class = InventorySerializer
+    permission_classes = [ManagementWritePermission]
 
 
 def dashboard(request):
@@ -201,11 +178,43 @@ def dashboard(request):
         items_qs = items_qs.filter(sale__sold_at__range=(start_date, end_date))
     period_units_sold = sum(item.quantity for item in items_qs)
 
-    # Store-wide all time receivables — lean queryset to avoid full model loads
-    all_sales_summary = Sale.objects.only('payment_status', 'paid_amount').prefetch_related('items')
-    store_total_due = sum(s.due_amount for s in all_sales_summary)
-    store_total_revenue = sum(s.total_amount for s in all_sales_summary)
-    store_total_paid = sum(s.effective_paid_amount for s in all_sales_summary)
+    # Store-wide all time receivables — SQL-aggregated to avoid loading all sales & items
+    status_totals = (
+        SaleItem.objects
+        .values('sale__payment_status')
+        .annotate(
+            rev=Coalesce(
+                models.Sum(
+                    models.F('quantity') * models.F('unit_price'),
+                    output_field=models.DecimalField(max_digits=14, decimal_places=2),
+                ),
+                Decimal('0.00'),
+            )
+        )
+    )
+    rev_by_status = {row['sale__payment_status']: row['rev'] for row in status_totals}
+    store_total_revenue = sum(rev_by_status.values(), Decimal('0.00'))
+
+    partial_sales_qs = (
+        Sale.objects
+        .filter(payment_status='PARTIAL')
+        .annotate(
+            items_total=Coalesce(
+                models.Sum(
+                    models.F('items__quantity') * models.F('items__unit_price'),
+                    output_field=models.DecimalField(max_digits=14, decimal_places=2),
+                ),
+                Decimal('0.00'),
+            )
+        )
+        .only('paid_amount')
+    )
+    partial_paid = sum(
+        (min(s.paid_amount, s.items_total) for s in partial_sales_qs if s.paid_amount and s.paid_amount > 0),
+        Decimal('0.00'),
+    )
+    store_total_paid = rev_by_status.get('PAID', Decimal('0.00')) + partial_paid
+    store_total_due = max(Decimal('0.00'), store_total_revenue - store_total_paid)
 
     # Realized Gross Profit in period
     period_gross_profit = Decimal('0.00')
@@ -387,8 +396,12 @@ def inventory_list(request):
     from products.models import ProductGroup
     product_groups = ProductGroup.objects.all().order_by('name')
 
+    paginator = Paginator(filtered_inventory, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     return render(request, 'inventory/list.html', {
-        'inventory': filtered_inventory,
+        'inventory': page_obj.object_list,
+        'page_obj': page_obj,
         'query': query,
         'group_filter': group_filter,
         'status_filter': status_filter,
@@ -428,11 +441,15 @@ def inventory_logs(request):
 
     all_products = Product.objects.all().order_by('name')
 
-    # Count BEFORE slicing (sliced querysets cannot be counted)
+    # Count BEFORE slicing/pagination
     total_movements_count = movements.count()
 
+    paginator = Paginator(movements, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     return render(request, 'inventory/logs.html', {
-        'movements': movements[:150],
+        'movements': page_obj.object_list,
+        'page_obj': page_obj,
         'total_movements_count': total_movements_count,
         'selected_product_id': product_id,
         'selected_type': movement_type,
@@ -442,6 +459,7 @@ def inventory_logs(request):
     })
 
 
+@inventory_write_required
 def inventory_add_stock(request, pk):
     inventory = get_object_or_404(Inventory.objects.select_related('product', 'product__group'), pk=pk)
     form = StockAdjustmentForm(request.POST or None)
@@ -467,6 +485,7 @@ def inventory_add_stock(request, pk):
     )
 
 
+@inventory_write_required
 def inventory_remove_stock(request, pk):
     inventory = get_object_or_404(Inventory.objects.select_related('product', 'product__group'), pk=pk)
     form = StockAdjustmentForm(request.POST or None)
@@ -495,6 +514,7 @@ def inventory_remove_stock(request, pk):
     )
 
 
+@management_required
 def inventory_report_pdf(request):
     report_type = request.GET.get('type', 'stock')
     period = request.GET.get('period', 'today' if report_type != 'stock' else 'all')

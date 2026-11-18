@@ -11,9 +11,14 @@ from sales.models import Sale, SaleItem
 from suppliers.models import Supplier
 
 
+from accounts.models import UserProfile
+
+
 class SalePageTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='sales_user', password='pass')
+        self.user.profile.role = UserProfile.SALES
+        self.user.profile.save()
         self.client.force_login(self.user)
         self.product = Product.objects.create(
             name='Cable Tie',
@@ -615,10 +620,10 @@ class SalePageTests(TestCase):
 
         response = self.client.get(f'/sales/{sale2.pk}/receipt/')
         self.assertEqual(response.status_code, 200)
-        # Check cursive signature font and authorized username
-        self.assertContains(response, 'Dancing Script')
+        # Check manual signature lines (no auto-printed username)
+        self.assertContains(response, "Customer's Signature")
         self.assertContains(response, 'Authorized Signature')
-        self.assertContains(response, self.user.username)
+        self.assertNotContains(response, f'System Owner')
         # Check previous buy details
         self.assertContains(response, 'Previous Buy')
         self.assertContains(response, '50.00')
@@ -636,6 +641,141 @@ class SalePageTests(TestCase):
 
         with self.assertRaises(ProtectedError):
             self.product.delete()
+
+    def test_barcode_lookup_api_by_sku(self):
+        InventoryService.add_stock(self.product, 15)
+        response = self.client.get('/sales/barcode-lookup/', {'code': 'TIE-001'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['found'])
+        self.assertEqual(data['product']['name'], 'Cable Tie')
+        self.assertEqual(data['product']['sku'], 'TIE-001')
+        self.assertEqual(data['product']['stock'], 15)
+
+    def test_barcode_lookup_api_case_insensitive(self):
+        response = self.client.get('/sales/barcode-lookup/', {'code': 'tie-001'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['found'])
+        self.assertEqual(data['product']['id'], self.product.id)
+
+    def test_barcode_lookup_api_by_id(self):
+        response = self.client.get('/sales/barcode-lookup/', {'code': str(self.product.id)})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['found'])
+        self.assertEqual(data['product']['id'], self.product.id)
+
+    def test_barcode_lookup_api_not_found(self):
+        response = self.client.get('/sales/barcode-lookup/', {'code': 'NON-EXISTENT-BARCODE'})
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertFalse(data['found'])
+
+    def test_barcode_lookup_api_empty_code(self):
+        response = self.client.get('/sales/barcode-lookup/', {'code': ''})
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data['found'])
+
+    def test_sale_create_page_contains_barcode_station(self):
+        response = self.client.get('/sales/new/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'barcode-scanner-input')
+        self.assertContains(response, 'Barcode Reader / POS Scanner')
+        self.assertContains(response, 'camera-scanner-modal')
+        self.assertContains(response, 'btn-camera-scan')
+        self.assertContains(response, 'btn-toggle-sound')
+        self.assertContains(response, 'chk-auto-increment')
+
+    def test_toggle_status_get_not_allowed(self):
+        InventoryService.add_stock(self.product, 5)
+        sale = InventoryService.create_sale(
+            customer_name='Toggle Test',
+            payment_status='UNPAID',
+            items=[{'product': self.product, 'custom_name': '', 'quantity': 1, 'unit_price': Decimal('10.00')}],
+        )
+        response = self.client.get(f'/sales/{sale.pk}/toggle-status/')
+        self.assertEqual(response.status_code, 405)
+
+    def test_record_incremental_payment(self):
+        InventoryService.add_stock(self.product, 5)
+        sale = InventoryService.create_sale(
+            customer_name='Partial Payer',
+            payment_status='UNPAID',
+            items=[{'product': self.product, 'custom_name': '', 'quantity': 2, 'unit_price': Decimal('50.00')}],
+        )
+        res1 = self.client.post(f'/sales/{sale.pk}/record-payment/', {'amount': '40.00'})
+        self.assertEqual(res1.status_code, 302)
+        sale.refresh_from_db()
+        self.assertEqual(sale.payment_status, 'PARTIAL')
+        self.assertEqual(sale.paid_amount, Decimal('40.00'))
+
+        res2 = self.client.post(f'/sales/{sale.pk}/record-payment/', {'amount': '60.00'})
+        self.assertEqual(res2.status_code, 302)
+        sale.refresh_from_db()
+        self.assertEqual(sale.payment_status, 'PAID')
+        self.assertEqual(sale.paid_amount, Decimal('100.00'))
+
+    def test_cancel_sale_restores_stock(self):
+        InventoryService.add_stock(self.product, 10)
+        sale = InventoryService.create_sale(
+            customer_name='Cancel Test',
+            payment_status='PAID',
+            items=[{'product': self.product, 'custom_name': '', 'quantity': 4, 'unit_price': Decimal('10.00')}],
+        )
+        self.product.inventory.refresh_from_db()
+        self.assertEqual(self.product.inventory.quantity, 6)
+
+        # Salesman cannot cancel a sale
+        denied_res = self.client.post(f'/sales/{sale.pk}/cancel/')
+        self.assertEqual(denied_res.status_code, 403)
+        self.assertTrue(Sale.objects.filter(pk=sale.pk).exists())
+
+        # Admin can cancel a sale and restore stock
+        admin_user = User.objects.create_user(username='sales_admin', password='pass')
+        admin_user.profile.role = UserProfile.ADMIN
+        admin_user.profile.save()
+        self.client.force_login(admin_user)
+        res = self.client.post(f'/sales/{sale.pk}/cancel/')
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(Sale.objects.filter(pk=sale.pk).exists())
+        self.product.inventory.refresh_from_db()
+        self.assertEqual(self.product.inventory.quantity, 10)
+
+    def test_api_sales_offline_queue_payload_and_no_cdns(self):
+        InventoryService.add_stock(self.product, 10)
+        new_res = self.client.get('/sales/new/')
+        self.assertEqual(new_res.status_code, 200)
+        self.assertNotIn('unpkg.com', new_res.content.decode())
+
+        api_res = self.client.post(
+            '/api/sales/',
+            data={
+                'customer_name': 'Offline Sync Customer',
+                'customer_phone': '01799999999',
+                'customer_address': 'Dhaka',
+                'payment_status': 'PAID',
+                'paid_amount': '20.00',
+                'items': [
+                    {'product': self.product.pk, 'custom_name': '', 'quantity': 3, 'unit_price': '10.00'}
+                ],
+            },
+            content_type='application/json',
+        )
+        self.assertEqual(api_res.status_code, 201)
+        self.product.inventory.refresh_from_db()
+        self.assertEqual(self.product.inventory.quantity, 7)
+
+    def test_sales_list_renders_invoice_scanner_and_kpis(self):
+        res = self.client.get('/sales/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'invoice-barcode-input')
+        self.assertContains(res, 'btn-invoice-camera')
+        self.assertContains(res, 'Total Billed')
+        self.assertContains(res, 'Outstanding Due')
+
+
 
 
 

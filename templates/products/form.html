@@ -64,7 +64,7 @@
                 </label>
 
                 <!-- Category Group & SKU row -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; align-items: start;">
                     <!-- Group -->
                     <label class="field">
                         <span style="font-weight: 700; color: #0f172a;">Product Group / Category</span>
@@ -76,29 +76,52 @@
                     </label>
 
                     <!-- SKU / Barcode -->
-                    <label class="field">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <span style="font-weight: 700; color: #0f172a;">SKU / Barcode</span>
-                            <button type="button" id="btn-generate-sku" class="button" style="padding: 2px 8px; font-size: 11px; height: auto; background: #f1f5f9; border-color: #cbd5e1; font-weight: 600;">
+                    <div class="field">
+                        <label for="id_sku" style="font-weight: 700; color: #0f172a;">SKU / Barcode</label>
+                        <div style="display: flex; gap: 8px; align-items: stretch;">
+                            <div style="flex: 1; min-width: 0;">{{ form.sku }}</div>
+                            <button type="button" id="btn-generate-sku" class="button" style="padding: 0 12px; font-size: 12px; background: #f1f5f9; border-color: #cbd5e1; font-weight: 600; flex-shrink: 0;">
                                 ⚡ Auto-Generate
                             </button>
                         </div>
-                        {{ form.sku }}
                         {% if form.sku.help_text %}<small style="color: #64748b;">{{ form.sku.help_text }}</small>{% endif %}
                         {% for error in form.sku.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
-                    </label>
+
+                        <!-- Live Barcode Preview Box -->
+                        <div id="barcode-preview-container" style="display: none; margin-top: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 10.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .05em;">Scannable Barcode (Code 128)</span>
+                                {% if product.pk %}
+                                <a href="{% url 'products:barcode_label' product.pk %}" target="_blank" class="button" style="padding: 2px 8px; font-size: 11px; min-height: 26px; background: #ecfdf5; border-color: #a7f3d0; color: #065f46; font-weight: 700; text-decoration: none;">
+                                    🖨️ Print Labels
+                                </a>
+                                {% endif %}
+                            </div>
+                            <div id="barcode-svg-wrapper" style="display: flex; justify-content: center; background: #ffffff; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; min-height: 44px; align-items: center;">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Selling Price & Low Stock Threshold Row -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px;">
+                <!-- Purchase Price, Selling Price & Low Stock Threshold Row -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; align-items: start;">
+                    <!-- Purchase Price -->
+                    <label class="field">
+                        <span style="font-weight: 700; color: #0f172a;">Purchase / Cost Price (BDT)</span>
+                        <div class="input-prefix-wrap">
+                            <span class="input-prefix-label">BDT</span>
+                            {{ form.purchase_price }}
+                        </div>
+                        <small style="color: #64748b;">Supplier unit cost for profit &amp; valuation KPIs.</small>
+                        {% for error in form.purchase_price.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
+                    </label>
+
                     <!-- Selling Price -->
                     <label class="field">
                         <span style="font-weight: 700; color: #0f172a;">Selling Price (BDT) <span style="color: #dc2626;">*</span></span>
-                        <div style="position: relative;">
-                            <span style="position: absolute; left: 12px; top: 11px; color: #64748b; font-size: 13px; font-weight: 700;">BDT</span>
-                            <div style="padding-left: 36px;">
-                                {{ form.selling_price }}
-                            </div>
+                        <div class="input-prefix-wrap">
+                            <span class="input-prefix-label">BDT</span>
+                            {{ form.selling_price }}
                         </div>
                         <small style="color: #64748b;">Customer retail price at POS checkout.</small>
                         {% for error in form.selling_price.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
@@ -112,6 +135,27 @@
                         {% for error in form.low_stock_threshold.errors %}<strong style="color: #dc2626; font-size: 12px;">{{ error }}</strong>{% endfor %}
                     </label>
                 </div>
+
+                <!-- Live Pricing & Margin Calculator -->
+                <div class="pricing-calc-card">
+                    <div style="font-size: 12px; font-weight: 700; color: #0f766e; text-transform: uppercase; letter-spacing: .04em;">
+                        Live Margin &amp; Profit Preview
+                    </div>
+                    <div class="calc-grid">
+                        <div class="calc-stat">
+                            <span class="calc-stat-label">Unit Profit</span>
+                            <span id="calc-profit-val" class="calc-stat-val profit">BDT 0.00</span>
+                        </div>
+                        <div class="calc-stat">
+                            <span class="calc-stat-label">Profit Margin</span>
+                            <span id="calc-margin-val" class="calc-stat-val margin">0.0%</span>
+                        </div>
+                        <div class="calc-stat">
+                            <span class="calc-stat-label">Markup</span>
+                            <span id="calc-markup-val" class="calc-stat-val markup">0.0%</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Form Action Buttons -->
@@ -124,4 +168,77 @@
         </form>
     </section>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const skuInput = document.getElementById('id_sku');
+    const genBtn = document.getElementById('btn-generate-sku');
+    const previewContainer = document.getElementById('barcode-preview-container');
+    const svgWrapper = document.getElementById('barcode-svg-wrapper');
+
+    let debounceTimer = null;
+
+    function updateBarcodePreview(code) {
+        const val = (code || '').trim();
+        if (!val) {
+            if (previewContainer) previewContainer.style.display = 'none';
+            return;
+        }
+
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+            try {
+                const resp = await fetch(`/products/api/barcode-preview/?code=${encodeURIComponent(val)}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.valid && data.svg) {
+                        if (svgWrapper) svgWrapper.innerHTML = data.svg;
+                        if (previewContainer) previewContainer.style.display = 'block';
+                    }
+                }
+            } catch (err) {}
+        }, 150);
+    }
+
+    if (skuInput) {
+        skuInput.addEventListener('input', () => {
+            updateBarcodePreview(skuInput.value);
+        });
+        if (skuInput.value.trim()) {
+            updateBarcodePreview(skuInput.value.trim());
+        }
+    }
+
+    if (genBtn && skuInput) {
+        genBtn.addEventListener('click', async () => {
+            try {
+                genBtn.disabled = true;
+                genBtn.textContent = 'Generating...';
+                const nameVal = document.getElementById('id_name')?.value || '';
+                const groupEl = document.getElementById('id_group');
+                const groupText = groupEl && groupEl.selectedIndex > 0 ? groupEl.options[groupEl.selectedIndex].text : '';
+                const resp = await fetch(`/products/api/generate-sku/?name=${encodeURIComponent(nameVal)}&group=${encodeURIComponent(groupText)}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.sku) {
+                        skuInput.value = data.sku;
+                        if (svgWrapper && data.svg) {
+                            svgWrapper.innerHTML = data.svg;
+                            if (previewContainer) previewContainer.style.display = 'block';
+                        }
+                        if (typeof showToast === 'function') {
+                            showToast(`Generated SKU: ${data.sku}`, 'success');
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                genBtn.disabled = false;
+                genBtn.textContent = '⚡ Auto-Generate';
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

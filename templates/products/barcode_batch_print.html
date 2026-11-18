@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+
+{% block title %}Batch Print Barcode Labels - Mtronix{% endblock %}
+{% block page_title %}Batch Barcode Label Printing{% endblock %}
+{% block page_subtitle %}Generate and mass-print barcode stickers for catalog inventory{% endblock %}
+
+{% block content %}
+<style>
+/* ── Screen Controls ──────────────────────────────────────────────── */
+.batch-toolbar {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+.batch-filter-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.filter-fields {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.filter-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #334155;
+}
+.filter-field label {
+    font-weight: 600;
+}
+.filter-field select, .filter-field input[type="number"] {
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+    background: #fff;
+}
+.filter-field select:focus, .filter-field input:focus {
+    border-color: #0f766e;
+    box-shadow: 0 0 0 3px rgba(15,118,110,0.12);
+}
+
+/* ── Barcode Sheet Previews ───────────────────────────────────────── */
+.barcode-sheet-container {
+    background: #f1f5f9;
+    padding: 24px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+}
+
+.barcode-sticker {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    text-align: center;
+    overflow: hidden;
+    user-select: none;
+}
+
+/* Thermal 50mm x 30mm Roll Layout */
+.layout-thermal .labels-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+.layout-thermal .barcode-sticker {
+    width: 200px;
+    height: 120px;
+    padding: 6px 8px;
+    border-radius: 6px;
+}
+
+/* A4 Sheet - 24 labels (3x8 grid) */
+.layout-a4_24 .labels-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 800px;
+    background: #ffffff;
+    padding: 18px;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+.layout-a4_24 .barcode-sticker {
+    height: 120px;
+    padding: 6px 8px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 4px;
+}
+
+/* A4 Sheet - 30 labels (3x10 grid) */
+.layout-a4_30 .labels-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+    max-width: 800px;
+    background: #ffffff;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+.layout-a4_30 .barcode-sticker {
+    height: 100px;
+    padding: 4px 6px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 4px;
+}
+
+/* Sticker Elements */
+.bs-store {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0f172a;
+    line-height: 1.1;
+}
+.bs-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.15;
+    max-height: 26px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    margin: 1px 0;
+}
+.bs-barcode-svg {
+    width: 100%;
+    max-height: 48px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.bs-barcode-svg svg {
+    max-width: 100%;
+    height: auto;
+    max-height: 48px;
+}
+.layout-a4_30 .bs-barcode-svg svg {
+    max-height: 38px;
+}
+.bs-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding-top: 2px;
+    border-top: 1px dotted #e2e8f0;
+    font-size: 10.5px;
+    line-height: 1;
+}
+.bs-sku {
+    font-family: monospace;
+    font-weight: 700;
+    color: #334155;
+    letter-spacing: 0.03em;
+}
+.bs-price {
+    font-weight: 800;
+    color: #0f766e;
+}
+
+/* ── Print-specific Styles ────────────────────────────────────────── */
+@media print {
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .sidebar, .topbar, .batch-toolbar, .site-header, .brand, .nav, .sidebar-footer {
+        display: none !important;
+    }
+    .main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .barcode-sheet-container {
+        background: #ffffff !important;
+        padding: 0 !important;
+    }
+    .barcode-sticker {
+        border: none !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .layout-thermal {
+        width: 50mm;
+    }
+    .layout-thermal .labels-grid {
+        gap: 0;
+    }
+    .layout-thermal .barcode-sticker {
+        width: 50mm !important;
+        height: 30mm !important;
+        padding: 2mm !important;
+        page-break-after: always;
+        break-after: page;
+    }
+
+    .layout-a4_24 .labels-grid {
+        box-shadow: none !important;
+        padding: 0 !important;
+        gap: 2mm !important;
+    }
+    .layout-a4_24 .barcode-sticker {
+        height: 33mm !important;
+        border: 1px dotted #ccc !important;
+    }
+
+    .layout-a4_30 .labels-grid {
+        box-shadow: none !important;
+        padding: 0 !important;
+        gap: 1.5mm !important;
+    }
+    .layout-a4_30 .barcode-sticker {
+        height: 27mm !important;
+        border: 1px dotted #ccc !important;
+    }
+}
+</style>
+
+<div style="max-width: 1000px; margin: 0 auto;">
+
+    <!-- Toolbar Filters -->
+    <div class="batch-toolbar">
+        <form method="get" id="batch-form">
+            {% if ids_str %}
+            <input type="hidden" name="ids" value="{{ ids_str }}">
+            {% endif %}
+
+            <div class="batch-filter-row">
+                <div class="filter-fields">
+                    <div class="filter-field">
+                        <label for="f-group">Group:</label>
+                        <select name="group" id="f-group" onchange="document.getElementById('batch-form').submit()">
+                            <option value="">All Groups ({{ products|length }} Products)</option>
+                            {% for g in groups %}
+                            <option value="{{ g.pk }}" {% if selected_group == g.pk|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="filter-field">
+                        <label for="f-mode">Copies Mode:</label>
+                        <select name="mode" id="f-mode" onchange="document.getElementById('batch-form').submit()">
+                            <option value="fixed" {% if selected_mode == 'fixed' %}selected{% endif %}>Fixed Count per Item</option>
+                            <option value="stock" {% if selected_mode == 'stock' %}selected{% endif %}>Match Current Stock Count</option>
+                        </select>
+                    </div>
+
+                    {% if selected_mode != 'stock' %}
+                    <div class="filter-field">
+                        <label for="f-copies">Copies per item:</label>
+                        <input type="number" name="copies" id="f-copies" value="{{ copies_per_item }}" min="1" max="50" style="width: 65px;">
+                        <button type="submit" class="button" style="padding: 4px 8px; font-size: 12px;">Update</button>
+                    </div>
+                    {% endif %}
+
+                    <div class="filter-field">
+                        <label for="f-layout">Sheet Layout:</label>
+                        <select name="layout" id="f-layout" onchange="document.getElementById('batch-form').submit()">
+                            <option value="a4_30" {% if layout == 'a4_30' %}selected{% endif %}>A4 Sheet (30 Labels - 3&times;10)</option>
+                            <option value="a4_24" {% if layout == 'a4_24' %}selected{% endif %}>A4 Sheet (24 Labels - 3&times;8)</option>
+                            <option value="thermal" {% if layout == 'thermal' %}selected{% endif %}>Thermal Roll (50mm &times; 30mm)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span class="badge" style="background: #eff6ff; color: #1e40af; font-weight: 700; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
+                        🏷️ Total Stickers: {{ total_stickers }}
+                    </span>
+                    <a href="{% url 'products:list' %}" class="button" style="font-size: 13px;">&larr; Products</a>
+                    <button type="button" onclick="window.print()" class="button primary" style="font-size: 13px; font-weight: 700; box-shadow: 0 4px 12px rgba(15,118,110,0.25);">
+                        🖨️ Print All Labels
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Printable Barcode Sheet -->
+    <div class="barcode-sheet-container layout-{{ layout }}">
+        <div class="labels-grid">
+            {% for item in labels %}
+            <div class="barcode-sticker">
+                <div class="bs-store">MTRONIX</div>
+                <div class="bs-name" title="{{ item.product.name }}">{{ item.product.name }}</div>
+                <div class="bs-barcode-svg">
+                    {{ item.barcode_svg|safe }}
+                </div>
+                <div class="bs-footer">
+                    <span class="bs-sku">{{ item.product.sku }}</span>
+                    <span class="bs-price">BDT {{ item.product.selling_price }}</span>
+                </div>
+            </div>
+            {% empty %}
+            <div style="padding: 40px; text-align: center; color: #64748b; font-size: 14px;">
+                No products match the selected criteria.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

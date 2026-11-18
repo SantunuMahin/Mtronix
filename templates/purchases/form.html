@@ -2,16 +2,84 @@
 
 {% block title %}{{ title }} - Mtronix{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
-{% block page_subtitle %}Adding a purchase automatically increases inventory stock.{% endblock %}
+{% block page_subtitle %}Log incoming supplier stock. Inventory quantity and product cost price update automatically.{% endblock %}
+{% block header_action %}
+<a class="button" href="{% url 'purchases:list' %}">&larr; Back to Purchases</a>
+{% endblock %}
 
 {% block content %}
-<section class="panel form-panel">
-    <form method="post" novalidate>
-        {% include 'includes/form.html' %}
-        <div class="form-actions">
-            <a class="button" href="{% url 'purchases:list' %}">Cancel</a>
-            <button class="button primary" type="submit">Save Purchase</button>
-        </div>
-    </form>
-</section>
+<div style="max-width: 720px; margin: 0 auto;">
+    <section class="panel" style="border-radius: 14px; padding: 28px;">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert" style="margin-bottom: 18px;">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div style="display: grid; gap: 18px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; align-items: start;">
+                    <label class="field">
+                        <span style="font-weight: 700;">Supplier <span style="color: #dc2626;">*</span></span>
+                        {{ form.supplier }}
+                        <small style="color: #64748b;">Need a new supplier? <a href="{% url 'suppliers:create' %}" style="color: #0f766e; font-weight: 600;">+ Add Supplier</a></small>
+                        {% for error in form.supplier.errors %}<strong>{{ error }}</strong>{% endfor %}
+                    </label>
+
+                    <label class="field">
+                        <span style="font-weight: 700;">Product <span style="color: #dc2626;">*</span></span>
+                        {{ form.product }}
+                        {% for error in form.product.errors %}<strong>{{ error }}</strong>{% endfor %}
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; align-items: start;">
+                    <label class="field">
+                        <span style="font-weight: 700;">Quantity <span style="color: #dc2626;">*</span></span>
+                        {{ form.quantity }}
+                        {% for error in form.quantity.errors %}<strong>{{ error }}</strong>{% endfor %}
+                    </label>
+
+                    <label class="field">
+                        <span style="font-weight: 700;">Unit Cost Price (BDT) <span style="color: #dc2626;">*</span></span>
+                        <div class="input-prefix-wrap">
+                            <span class="input-prefix-label">BDT</span>
+                            {{ form.unit_price }}
+                        </div>
+                        {% for error in form.unit_price.errors %}<strong>{{ error }}</strong>{% endfor %}
+                    </label>
+                </div>
+
+                <div style="background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 10px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 13px; font-weight: 700; color: #0f766e; text-transform: uppercase; letter-spacing: 0.04em;">Estimated Total Cost</span>
+                    <strong id="purchase-total-preview" style="font-size: 20px; color: #0f172a;">BDT 0.00</strong>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 10px;">
+                <a class="button" href="{% url 'purchases:list' %}">Cancel</a>
+                <button class="button primary" type="submit" style="font-weight: 700;">Save Purchase &amp; Restock</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const qtyInput = document.getElementById('id_quantity');
+    const priceInput = document.getElementById('id_unit_price');
+    const totalEl = document.getElementById('purchase-total-preview');
+
+    function updateTotal() {
+        const qty = parseFloat(qtyInput?.value) || 0;
+        const price = parseFloat(priceInput?.value) || 0;
+        totalEl.textContent = `BDT ${(qty * price).toFixed(2)}`;
+    }
+
+    if (qtyInput && priceInput && totalEl) {
+        qtyInput.addEventListener('input', updateTotal);
+        priceInput.addEventListener('input', updateTotal);
+        updateTotal();
+    }
+});
+</script>
 {% endblock %}

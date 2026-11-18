@@ -51,11 +51,7 @@ class Product(models.Model):
             self.sku = self.sku.strip() or None
         else:
             self.sku = None
-        is_new = self.pk is None
         super().save(*args, **kwargs)
-        if is_new:
-            from inventory.models import Inventory
-            Inventory.objects.get_or_create(product=self, defaults={'quantity': 0})
 
     def __str__(self):
         if self.sku:

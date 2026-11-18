@@ -16,12 +16,28 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import TemplateView
+from rest_framework.routers import DefaultRouter
 
-from inventory.views import dashboard
+from inventory.views import InventoryViewSet, dashboard
+from products.views import ProductGroupViewSet, ProductViewSet
+from purchases.views import PurchaseViewSet
+from sales.views import SaleViewSet
+from suppliers.views import SupplierViewSet
+
+api_router = DefaultRouter()
+api_router.register(r'products', ProductViewSet, basename='api-products')
+api_router.register(r'product-groups', ProductGroupViewSet, basename='api-product-groups')
+api_router.register(r'inventory', InventoryViewSet, basename='api-inventory')
+api_router.register(r'sales', SaleViewSet, basename='api-sales')
+api_router.register(r'purchases', PurchaseViewSet, basename='api-purchases')
+api_router.register(r'suppliers', SupplierViewSet, basename='api-suppliers')
 
 urlpatterns = [
     path('', dashboard, name='dashboard'),
+    path('sw.js', TemplateView.as_view(template_name='sw.js', content_type='application/javascript'), name='service_worker'),
     path('admin/', admin.site.urls),
+    path('api/', include(api_router.urls)),
     path('accounts/', include('accounts.urls')),
     path('products/', include('products.urls')),
     path('suppliers/', include('suppliers.urls')),

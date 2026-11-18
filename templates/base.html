@@ -6,46 +6,82 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Mtronix{% endblock %}</title>
     <meta name="description" content="Mtronix Inventory and Sales Management System.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=2.5">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-    <script src="{% static 'js/app.js' %}?v=2.5" defer></script>
+    <meta name="theme-color" content="#0f766e">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=2.9">
+    <script>
+        (function() {
+            var mode = localStorage.getItem('mtronix_sidebar_mode');
+            if (mode === 'icons') document.documentElement.classList.add('sidebar-icons');
+            else if (mode === 'hidden') document.documentElement.classList.add('sidebar-hidden');
+        })();
+    </script>
+    <script src="{% static 'js/chart.umd.min.js' %}?v=4.4.3"></script>
+    <script src="{% static 'js/app.js' %}?v=2.9" defer></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
     <aside class="sidebar">
-        <a class="brand" href="{% url 'dashboard' %}">
-            <span class="brand-mark">M</span>
-            <span>Mtronix</span>
-        </a>
+        <div class="sidebar-top">
+            <a class="brand" href="{% url 'dashboard' %}" title="Mtronix Dashboard">
+                <span class="brand-mark">M</span>
+                <span class="brand-text">Mtronix</span>
+            </a>
+            <button type="button" id="btn-sidebar-collapse" class="sidebar-collapse-btn" title="Collapse to icons" aria-label="Collapse sidebar to icons">«</button>
+        </div>
         <nav class="nav">
-            <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-                <span class="nav-icon">⊞</span> Dashboard
+            <a href="{% url 'dashboard' %}" title="Dashboard" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+                <span class="nav-label">Dashboard</span>
             </a>
-            <a href="{% url 'products:list' %}" class="{% if 'products' in request.path and 'groups' not in request.path %}active{% endif %}">
-                <span class="nav-icon">📦</span> Products
+            <a href="{% url 'products:list' %}" title="Products" class="{% if 'products' in request.path and 'groups' not in request.path %}active{% endif %}">
+                <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+                <span class="nav-label">Products</span>
             </a>
-            <a href="{% url 'products:group_list' %}" class="{% if 'groups' in request.path %}active{% endif %}">
-                <span class="nav-icon">📁</span> Product Groups
+            <a href="{% url 'products:group_list' %}" title="Product Groups" class="{% if 'groups' in request.path %}active{% endif %}">
+                <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg></span>
+                <span class="nav-label">Product Groups</span>
             </a>
-            <a href="{% url 'inventory:list' %}" class="{% if 'inventory' in request.path %}active{% endif %}">
-                <span class="nav-icon">🗄</span> Inventory
+            <a href="{% url 'inventory:list' %}" title="Inventory" class="{% if 'inventory' in request.path %}active{% endif %}">
+                <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7"/><path d="M21 7H3l2-4h14l2 4Z"/><path d="M10 12h4"/></svg></span>
+                <span class="nav-label">Inventory</span>
             </a>
-            <a href="{% url 'sales:list' %}" class="{% if 'sales' in request.path %}active{% endif %}">
-                <span class="nav-icon">💰</span> Sales
+            {% if rbac_can_manage_stock %}
+            <a href="{% url 'purchases:list' %}" title="Purchases" class="{% if 'purchases' in request.path %}active{% endif %}">
+                <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
+                <span class="nav-label">Purchases</span>
             </a>
+            <a href="{% url 'suppliers:list' %}" title="Suppliers" class="{% if 'suppliers' in request.path %}active{% endif %}">
+                <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></span>
+                <span class="nav-label">Suppliers</span>
+            </a>
+            {% endif %}
+            {% if rbac_can_access_sales %}
+            <a href="{% url 'sales:list' %}" title="Sales" class="{% if 'sales' in request.path %}active{% endif %}">
+                <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg></span>
+                <span class="nav-label">Sales</span>
+            </a>
+            {% endif %}
+            {% if rbac_is_admin %}
+            <a href="{% url 'accounts:users' %}" title="Staff & Roles" class="{% if 'accounts/users' in request.path %}active{% endif %}">
+                <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg></span>
+                <span class="nav-label">Staff &amp; Roles</span>
+            </a>
+            {% endif %}
         </nav>
 
         <!-- User profile card at bottom of sidebar -->
         <div class="sidebar-footer">
+            <div id="network-status-pill" title="Connectivity Status" style="display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; padding: 6px 10px; border-radius: 7px; margin-bottom: 10px; background: rgba(16, 185, 129, 0.14); color: #6ee7b7;">
+                <span id="network-status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; flex-shrink: 0;"></span>
+                <span id="network-status-text" class="nav-label">Online • Ready</span>
+            </div>
             {% if request.user.is_authenticated %}
-            <div class="user-card">
+            <div class="user-card" title="{{ request.user.get_full_name|default:request.user.username }}">
                 <div class="user-avatar">{{ request.user.username|slice:":2"|upper }}</div>
                 <div class="user-info">
                    <strong class="user-name">{{ request.user.get_full_name|default:request.user.username }}</strong>
-                    <span class="user-role" style="color: {% if request.user.profile.get_role_display == 'Admin' %}red{% elif request.user.is_superuser %}orange{% else %}inherit{% endif %};">
+                    <span class="user-role {% if request.user.is_superuser %}role-superuser{% elif request.user.profile.is_admin %}role-admin{% elif request.user.profile.is_system_owner %}role-owner{% elif request.user.profile.is_sales %}role-sales{% else %}role-staff{% endif %}">
                         {% if request.user.profile %}
                             {{ request.user.profile.get_role_display }}
                         {% elif request.user.is_superuser %}
@@ -57,14 +93,19 @@
                                     
                 </div>
             </div>
-            <a class="btn-logout" href="{% url 'accounts:logout' %}">Sign Out</a>
+            <form method="post" action="{% url 'accounts:logout' %}" style="margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="btn-logout" title="Sign Out" style="border: none; cursor: pointer; font-family: inherit;">
+                    <span class="nav-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span><span class="nav-label">Sign Out</span>
+                </button>
+            </form>
             {% endif %}
         </div>
     </aside>
 
     <div class="shell">
         <header class="topbar">
-            <button class="icon-button mobile-menu" type="button" data-menu-toggle aria-label="Toggle menu">☰</button>
+            <button class="sidebar-toggle-btn" type="button" data-menu-toggle title="Hide / Show Sidebar" aria-label="Toggle sidebar">☰</button>
             <div>
                 <h1>{% block page_title %}Dashboard{% endblock %}</h1>
                 <p>{% block page_subtitle %}Inventory and sales in one place.{% endblock %}</p>

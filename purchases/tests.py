@@ -9,7 +9,7 @@ from suppliers.models import Supplier
 
 class PurchasePageTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='purch_user', password='pass')
+        self.user = User.objects.create_user(username='purch_user', password='pass', is_superuser=True)
         self.client.force_login(self.user)
         self.product = Product.objects.create(
             name='Adapter',
@@ -46,3 +46,22 @@ class PurchasePageTests(TestCase):
         self.assertEqual(sm.movement_type, StockMovement.MOVEMENT_PURCHASE)
         self.assertEqual(sm.quantity, 5)
         self.assertEqual(sm.user, self.user)
+
+    def test_purchase_syncs_product_purchase_price_and_filters(self):
+        from decimal import Decimal
+        self.client.post(
+            '/purchases/new/',
+            {
+                'supplier': self.supplier.pk,
+                'product': self.product.pk,
+                'quantity': 3,
+                'unit_price': '6.50',
+            },
+        )
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.purchase_price, Decimal('6.50'))
+
+        res = self.client.get(f'/purchases/?q=Adapter&supplier={self.supplier.pk}')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Adapter')
+        self.assertContains(res, '19.50')

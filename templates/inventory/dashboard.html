@@ -6,6 +6,7 @@
 
 {% block header_action %}
 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    {% if rbac_is_privileged %}
     <a class="button" href="{% url 'sales:customer_statement' %}" style="background: #ffffff; border: 1px solid var(--border); font-weight: 600; font-size: 13px;">
         📄 Statements & Ledgers
     </a>
@@ -15,6 +16,11 @@
     <a class="button primary" href="{% url 'sales:create' %}" style="font-weight: 700; font-size: 13px; box-shadow: 0 4px 12px rgba(15,118,110,0.28);">
         ⚡ New Sale (POS)
     </a>
+    {% elif rbac_can_access %}
+    <a class="button primary" href="{% url 'purchases:create' %}" style="font-weight: 700; font-size: 13px; box-shadow: 0 4px 12px rgba(15,118,110,0.28);">
+        📥 New Purchase
+    </a>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -336,21 +342,40 @@
 <!-- ── Quick Action Shortcuts Strip ── -->
 <div class="quick-action-strip">
     <span class="quick-action-label">⚡ Quick Actions:</span>
+    {% if rbac_can_access_sales %}
     <a href="{% url 'sales:create' %}" class="quick-btn primary">
         <span>+</span> POS Terminal
     </a>
+    {% endif %}
+    {% if rbac_is_management %}
     <a href="{% url 'products:create' %}" class="quick-btn">
         <span>📦</span> Add Product
     </a>
+    {% endif %}
+    {% if rbac_can_manage_stock %}
+    <a href="{% url 'purchases:create' %}" class="quick-btn">
+        <span>📥</span> New Purchase
+    </a>
+    <a href="{% url 'suppliers:list' %}" class="quick-btn">
+        <span>🏭</span> Suppliers
+    </a>
+    {% endif %}
     <a href="{% url 'inventory:list' %}" class="quick-btn">
         <span>🗄️</span> Stock Manager
     </a>
     <a href="{% url 'products:group_list' %}" class="quick-btn">
         <span>📁</span> Product Groups
     </a>
+    {% if rbac_can_access_sales %}
     <a href="{% url 'sales:customer_statement' %}" class="quick-btn">
-        <span>👥</span> Debtors & Statements
+        <span>👥</span> Debtors &amp; Statements
     </a>
+    {% endif %}
+    {% if rbac_is_admin %}
+    <a href="{% url 'accounts:users' %}" class="quick-btn">
+        <span>🛡️</span> Staff &amp; Roles
+    </a>
+    {% endif %}
     <a href="{% url 'inventory:logs' %}" class="quick-btn">
         <span>📝</span> Audit Logs
     </a>
@@ -748,12 +773,7 @@
         if (typeof Chart !== 'undefined') {
             renderWithChartJs();
         } else {
-            // If Chart.js CDN is unavailable or blocked, dynamically try loading cdnjs or fallback to Native Canvas
-            const altScript = document.createElement('script');
-            altScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-            altScript.onload = () => renderWithChartJs();
-            altScript.onerror = () => renderWithNativeCanvas();
-            document.head.appendChild(altScript);
+            renderWithNativeCanvas();
         }
     }
 

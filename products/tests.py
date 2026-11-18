@@ -31,7 +31,7 @@ class ProductSerializerTests(TestCase):
 
 class ProductPageTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='prod_user', password='pass')
+        self.user = User.objects.create_user(username='prod_user', password='pass', is_superuser=True)
         self.client.force_login(self.user)
 
     def test_product_list_renders(self):
@@ -176,3 +176,157 @@ class ProductPageTests(TestCase):
         res_sku = self.client.get('/products/?q=MCU-002')
         self.assertContains(res_sku, 'ESP32 DevKit')
         self.assertNotContains(res_sku, 'Arduino Uno R3')
+
+
+class ProductBarcodeTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='barcode_user', password='pass', is_superuser=True)
+        self.client.force_login(self.user)
+        self.group = ProductGroup.objects.create(name='Power Supplies')
+        self.product = Product.objects.create(
+            name='12V 5A Power Adapter',
+            sku='PS12-5A',
+            group=self.group,
+            purchase_price='8.00',
+            selling_price='14.50',
+            low_stock_threshold=5,
+        )
+        self.product.inventory.quantity = 15
+        self.product.inventory.save()
+
+    def test_single_barcode_label_view_renders_correctly(self):
+        res = self.client.get(f'/products/{self.product.pk}/barcode/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, '12V 5A Power Adapter')
+        self.assertContains(res, 'PS12-5A')
+        self.assertContains(res, '<svg')
+        self.assertContains(res, '50mm')
+        self.assertContains(res, '30mm')
+
+    def test_single_barcode_label_view_404_for_nonexistent_product(self):
+        res = self.client.get('/products/99999/barcode/')
+        self.assertEqual(res.status_code, 404)
+
+    def test_single_barcode_generates_identifier_if_sku_is_empty(self):
+        p_no_sku = Product.objects.create(
+            name='Loose Wire Spool',
+            sku='',
+            purchase_price='1.00',
+            selling_price='2.00',
+        )
+        res = self.client.get(f'/products/{p_no_sku.pk}/barcode/')
+        self.assertEqual(res.status_code, 200)
+        p_no_sku.refresh_from_db()
+        self.assertTrue(p_no_sku.sku.startswith('MTX-'))
+        self.assertContains(res, p_no_sku.sku)
+        self.assertContains(res, '<svg')
+
+    def test_batch_barcode_view_renders_all_products(self):
+        p2 = Product.objects.create(
+            name='USB-C Hub',
+            sku='HUB-C01',
+            purchase_price='12.00',
+            selling_price='22.00',
+        )
+        res = self.client.get('/products/barcode/batch/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, '12V 5A Power Adapter')
+        self.assertContains(res, 'USB-C Hub')
+        self.assertContains(res, '<svg')
+        self.assertContains(res, 'Batch Barcode Label Printing')
+
+    def test_batch_barcode_view_filter_by_group(self):
+        other_grp = ProductGroup.objects.create(name='Cables')
+        p_cable = Product.objects.create(
+            name='Cat6 Patch Cable',
+            sku='CBL-CAT6',
+            group=other_grp,
+            purchase_price='2.00',
+            selling_price='4.00',
+        )
+        res = self.client.get(f'/products/barcode/batch/?group={self.group.pk}')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, '12V 5A Power Adapter')
+        self.assertNotContains(res, 'Cat6 Patch Cable')
+
+    def test_api_generate_sku(self):
+        res = self.client.get('/products/api/generate-sku/?name=Soldering+Iron&group=Tools')
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data.get('success'))
+        self.assertIn('sku', data)
+        self.assertTrue(data['sku'].startswith('TOOL') or data['sku'].startswith('SOLD') or data['sku'].startswith('MTX'))
+
+    def test_api_preview_barcode(self):
+        res = self.client.get('/products/api/barcode-preview/?code=PS12-5A')
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data.get('success'))
+        self.assertIn('<svg', data['svg'])
+        self.assertTrue(data['data_uri'].startswith('data:image/svg+xml'))
+
+    def test_api_preview_barcode_empty_code(self):
+        res = self.client.get('/products/api/barcode-preview/?code=')
+        self.assertEqual(res.status_code, 400)
+        data = res.json()
+        self.assertFalse(data.get('success'))
+
+    def test_product_create_page_prefills_sku_from_get_param(self):
+        res = self.client.get('/products/new/?sku=SCANNED-9988')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'value="SCANNED-9988"')
+
+
+class BarcodeGenerationTests(TestCase):
+    def test_generate_code128_svg_with_show_text_false(self):
+        from products.barcode import generate_code128_svg
+        svg = generate_code128_svg('SALE-00030', height=32, show_text=False)
+        self.assertIn('<svg', svg)
+        self.assertNotIn('<text', svg)
+
+    def test_generate_code128_svg_with_include_text_false(self):
+        from products.barcode import generate_code128_svg
+        svg = generate_code128_svg('SALE-00030', height=32, include_text=False)
+        self.assertIn('<svg', svg)
+        self.assertNotIn('<text', svg)
+
+    def test_generate_code128_svg_default_includes_text(self):
+        from products.barcode import generate_code128_svg
+        svg = generate_code128_svg('SALE-00030', height=32)
+        self.assertIn('<svg', svg)
+        self.assertIn('<text', svg)
+        self.assertIn('SALE-00030', svg)
+
+    def test_generate_code128_data_uri_with_show_text(self):
+        from products.barcode import generate_code128_data_uri
+        uri = generate_code128_data_uri('MTX-12345', show_text=False)
+        self.assertTrue(uri.startswith('data:image/svg+xml;base64,'))
+
+    def test_generate_unique_product_sku(self):
+        from products.barcode import generate_unique_product_sku
+        sku = generate_unique_product_sku(prefix="MTX")
+        self.assertTrue(sku.startswith("MTX-"))
+        self.assertEqual(len(sku), 9)  # MTX- + 5 digits
+
+
+class ProductDeleteProtectionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='admin_prod', password='pass', is_superuser=True)
+        self.client.force_login(self.user)
+
+    def test_delete_product_with_purchase_shows_error_instead_of_500(self):
+        from suppliers.models import Supplier
+        from purchases.models import Purchase
+        supplier = Supplier.objects.create(name='Test Supplier', phone='01700000000')
+        product = Product.objects.create(
+            name='Protected Capacitor',
+            sku='CAP-PROT-1',
+            purchase_price='5.00',
+            selling_price='10.00',
+        )
+        Purchase.objects.create(supplier=supplier, product=product, quantity=5, unit_price='5.00')
+        response = self.client.post(f'/products/{product.pk}/delete/', follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Product.objects.filter(pk=product.pk).exists())
+        self.assertContains(response, 'Cannot delete')
+

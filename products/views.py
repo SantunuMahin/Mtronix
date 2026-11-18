@@ -2,11 +2,15 @@ import csv
 from decimal import Decimal
 
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db import models
-from django.http import HttpResponse
+from django.db.models import ProtectedError
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from rest_framework import viewsets
 
+from accounts.decorators import management_required
+from accounts.permissions import ManagementWritePermission
 from products.forms import ProductForm, ProductGroupForm
 from products.models import Product, ProductGroup
 from products.serializers import ProductGroupSerializer, ProductSerializer
@@ -15,11 +19,13 @@ from products.serializers import ProductGroupSerializer, ProductSerializer
 class ProductGroupViewSet(viewsets.ModelViewSet):
     queryset = ProductGroup.objects.all().order_by('name')
     serializer_class = ProductGroupSerializer
+    permission_classes = [ManagementWritePermission]
 
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.select_related('inventory', 'group').order_by('name')
     serializer_class = ProductSerializer
+    permission_classes = [ManagementWritePermission]
 
 
 def product_list(request):
@@ -106,11 +112,15 @@ def product_list(request):
 
     groups = ProductGroup.objects.all().order_by('name')
 
+    paginator = Paginator(product_items, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     return render(
         request,
         'products/list.html',
         {
-            'products': product_items,
+            'products': page_obj.object_list,
+            'page_obj': page_obj,
             'groups': groups,
             'selected_group': group_id,
             'status_filter': status_filter,
@@ -130,6 +140,7 @@ def product_list(request):
     )
 
 
+@management_required
 def product_export_csv(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="mtronix-products-catalog.csv"'
@@ -179,8 +190,14 @@ def product_export_csv(request):
     return response
 
 
+@management_required
 def product_create(request):
-    form = ProductForm(request.POST or None)
+    initial = {}
+    if request.method != 'POST':
+        sku_param = request.GET.get('sku', '').strip()
+        if sku_param:
+            initial['sku'] = sku_param
+    form = ProductForm(request.POST or None, initial=initial)
     if request.method == 'POST' and form.is_valid():
         product = form.save()
         messages.success(request, f'Product "{product.name}" created successfully.')
@@ -189,6 +206,7 @@ def product_create(request):
     return render(request, 'products/form.html', {'form': form, 'title': 'New Product'})
 
 
+@management_required
 def product_update(request, pk):
     product = get_object_or_404(Product, pk=pk)
     form = ProductForm(request.POST or None, instance=product)
@@ -200,12 +218,19 @@ def product_update(request, pk):
     return render(request, 'products/form.html', {'form': form, 'title': 'Edit Product', 'product': product})
 
 
+@management_required
 def product_delete(request, pk):
     product = get_object_or_404(Product, pk=pk)
     if request.method == 'POST':
         name = product.name
-        product.delete()
-        messages.success(request, f'Product "{name}" deleted successfully.')
+        try:
+            product.delete()
+            messages.success(request, f'Product "{name}" deleted successfully.')
+        except ProtectedError:
+            messages.error(
+                request,
+                f'Cannot delete "{name}" because it has linked purchase history.'
+            )
         return redirect('products:list')
 
     return render(request, 'products/confirm_delete.html', {'product': product})
@@ -248,6 +273,7 @@ def group_list(request):
     )
 
 
+@management_required
 def group_create(request):
     form = ProductGroupForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
@@ -262,6 +288,7 @@ def group_create(request):
     )
 
 
+@management_required
 def group_update(request, pk):
     group = get_object_or_404(ProductGroup, pk=pk)
     form = ProductGroupForm(request.POST or None, instance=group)
@@ -277,6 +304,7 @@ def group_update(request, pk):
     )
 
 
+@management_required
 def group_delete(request, pk):
     group = get_object_or_404(ProductGroup, pk=pk)
     if request.method == 'POST':
@@ -290,3 +318,164 @@ def group_delete(request, pk):
         'products/group_confirm_delete.html',
         {'group': group},
     )
+
+
+# ─── Barcode Printing & Generation Views ──────────────────────────────
+
+def product_barcode_label(request, pk):
+    """
+    Render a printable barcode label sheet for a single product.
+    Allows user to select quantity of stickers and format (thermal label or A4 sheet).
+    """
+    from products.barcode import generate_code128_svg, generate_code128_data_uri, generate_unique_product_sku
+
+    product = get_object_or_404(Product.objects.select_related('inventory', 'group'), pk=pk)
+
+    # If product has no SKU/Barcode, auto-generate and save one so it can be scanned
+    if not product.sku:
+        product.sku = generate_unique_product_sku()
+        product.save(update_fields=['sku'])
+        messages.info(request, f'Generated unique barcode/SKU: {product.sku}')
+
+    try:
+        copies = max(1, min(200, int(request.GET.get('copies', 1))))
+    except ValueError:
+        copies = 1
+
+    layout = request.GET.get('layout', 'thermal')
+    if layout not in ('thermal', 'a4_24', 'a4_30'):
+        layout = 'thermal'
+
+    barcode_svg = generate_code128_svg(product.sku, height=45, module_width=1.7)
+    barcode_data_uri = generate_code128_data_uri(product.sku, height=45, module_width=1.7)
+
+    labels = [
+        {
+            'product': product,
+            'barcode_svg': barcode_svg,
+            'barcode_data_uri': barcode_data_uri,
+        }
+        for _ in range(copies)
+    ]
+
+    return render(
+        request,
+        'products/barcode_label.html',
+        {
+            'product': product,
+            'labels': labels,
+            'copies': copies,
+            'layout': layout,
+            'barcode_svg': barcode_svg,
+        },
+    )
+
+
+def product_barcode_batch_print(request):
+    """
+    Batch print barcode labels for multiple selected or all products.
+    """
+    from products.barcode import generate_code128_svg, generate_code128_data_uri, generate_unique_product_sku
+
+    ids_str = request.GET.get('ids', '').strip()
+    group_id = request.GET.get('group', '').strip()
+    mode = request.GET.get('mode', 'fixed')  # 'fixed' or 'stock'
+    layout = request.GET.get('layout', 'a4_30')  # 'thermal', 'a4_24', 'a4_30'
+
+    try:
+        copies_per_item = max(1, min(50, int(request.GET.get('copies', 1))))
+    except ValueError:
+        copies_per_item = 1
+
+    qs = Product.objects.select_related('inventory', 'group').order_by('name')
+
+    if ids_str:
+        id_list = [int(i.strip()) for i in ids_str.split(',') if i.strip().isdigit()]
+        if id_list:
+            qs = qs.filter(pk__in=id_list)
+    elif group_id and group_id.isdigit():
+        qs = qs.filter(group_id=int(group_id))
+
+    products = list(qs)
+
+    # Ensure every product has a valid barcode SKU
+    for p in products:
+        if not p.sku:
+            p.sku = generate_unique_product_sku()
+            p.save(update_fields=['sku'])
+
+    all_labels = []
+    for p in products:
+        svg = generate_code128_svg(p.sku, height=42, module_width=1.6)
+        data_uri = generate_code128_data_uri(p.sku, height=42, module_width=1.6)
+
+        num_copies = copies_per_item
+        if mode == 'stock':
+            num_copies = max(1, p.total_stock)
+
+        for _ in range(num_copies):
+            all_labels.append({
+                'product': p,
+                'barcode_svg': svg,
+                'barcode_data_uri': data_uri,
+            })
+
+    groups = ProductGroup.objects.all().order_by('name')
+
+    return render(
+        request,
+        'products/barcode_batch_print.html',
+        {
+            'labels': all_labels,
+            'products': products,
+            'groups': groups,
+            'total_stickers': len(all_labels),
+            'selected_group': group_id,
+            'selected_mode': mode,
+            'copies_per_item': copies_per_item,
+            'layout': layout,
+            'ids_str': ids_str,
+        },
+    )
+
+
+def api_generate_sku(request):
+    """
+    API to generate a unique SKU and its live SVG barcode representation.
+    """
+    from products.barcode import generate_unique_product_sku, generate_code128_svg
+
+    prefix = request.GET.get('prefix', 'MTX').strip() or 'MTX'
+    name_hint = request.GET.get('name', '').strip()
+    group_hint = request.GET.get('group', '').strip()
+    sku = generate_unique_product_sku(prefix=prefix, name_hint=name_hint or group_hint)
+    svg = generate_code128_svg(sku, height=42)
+
+    return JsonResponse({
+        'success': True,
+        'sku': sku,
+        'svg': svg,
+    })
+
+
+def api_preview_barcode(request):
+    """
+    API to generate live SVG barcode for any typed text.
+    """
+    from products.barcode import generate_code128_svg, generate_code128_data_uri
+
+    code = request.GET.get('code', '').strip()
+    if not code:
+        return JsonResponse({'success': False, 'valid': False, 'message': 'Code is required'}, status=400)
+
+    svg = generate_code128_svg(code, height=44)
+    data_uri = generate_code128_data_uri(code, height=44)
+
+    return JsonResponse({
+        'success': True,
+        'valid': True,
+        'code': code,
+        'svg': svg,
+        'data_uri': data_uri,
+    })
+

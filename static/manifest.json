@@ -1,0 +1,16 @@
+{
+  "name": "Mtronix POS & Inventory",
+  "short_name": "Mtronix",
+  "description": "Offline-capable Inventory, Purchasing & POS Sales System.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0f4f8",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/static/img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

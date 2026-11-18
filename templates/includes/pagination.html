@@ -1,0 +1,16 @@
+{% if page_obj and page_obj.has_other_pages %}
+<div class="pagination-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #475569; flex-wrap: wrap; gap: 10px;">
+    <span>
+        Showing page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
+        ({{ page_obj.paginator.count }} total)
+    </span>
+    <div style="display: flex; gap: 6px; align-items: center;">
+        {% if page_obj.has_previous %}
+        <a class="button" href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" style="padding: 4px 10px; font-size: 12px;">← Prev</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a class="button" href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" style="padding: 4px 10px; font-size: 12px;">Next →</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

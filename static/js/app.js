@@ -47,11 +47,41 @@ function fallbackCopy(text, label) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Mobile sidebar toggle
+    // Sidebar toggle (desktop: hide/show + icon-only collapse; mobile: drawer)
     const menuToggle = document.querySelector('[data-menu-toggle]');
+    const collapseBtn = document.getElementById('btn-sidebar-collapse');
+    const rootEl = document.documentElement;
+
+    function syncCollapseBtnIcon() {
+        if (!collapseBtn) return;
+        const isIcons = rootEl.classList.contains('sidebar-icons');
+        collapseBtn.textContent = isIcons ? '»' : '«';
+        collapseBtn.title = isIcons ? 'Expand sidebar' : 'Collapse to icons';
+    }
+    syncCollapseBtnIcon();
+
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', () => {
+            rootEl.classList.remove('sidebar-hidden');
+            const isIcons = rootEl.classList.toggle('sidebar-icons');
+            localStorage.setItem('mtronix_sidebar_mode', isIcons ? 'icons' : 'expanded');
+            syncCollapseBtnIcon();
+        });
+    }
+
     if (menuToggle) {
         menuToggle.addEventListener('click', () => {
-            document.body.classList.toggle('menu-open');
+            if (window.innerWidth <= 820) {
+                document.body.classList.toggle('menu-open');
+                return;
+            }
+            const isHidden = rootEl.classList.toggle('sidebar-hidden');
+            if (isHidden) {
+                localStorage.setItem('mtronix_sidebar_mode', 'hidden');
+            } else {
+                const isIcons = rootEl.classList.contains('sidebar-icons');
+                localStorage.setItem('mtronix_sidebar_mode', isIcons ? 'icons' : 'expanded');
+            }
         });
     }
 
@@ -127,15 +157,106 @@ document.addEventListener('DOMContentLoaded', () => {
         updateProductCalculations();
     }
 
-    // SKU Auto-generator button
-    const skuGenBtn = document.getElementById('btn-generate-sku');
-    const skuField = document.querySelector('input[name="sku"]');
-    if (skuGenBtn && skuField) {
-        skuGenBtn.addEventListener('click', () => {
-            const randomNum = Math.floor(100000 + Math.random() * 900000);
-            const generated = `MTX-${randomNum}`;
-            skuField.value = generated;
-            showToast(`Generated SKU: ${generated}`, 'success');
-        });
+    // ─── Service Worker & Network Status Indicator ────────────────
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+
+    function updateNetworkStatusUI() {
+        const pill = document.getElementById('network-status-pill');
+        const dot = document.getElementById('network-status-dot');
+        const text = document.getElementById('network-status-text');
+        if (!pill || !dot || !text) return;
+
+        if (navigator.onLine) {
+            pill.style.background = 'rgba(16, 185, 129, 0.14)';
+            pill.style.color = '#6ee7b7';
+            dot.style.background = '#10b981';
+            text.textContent = 'Online • Ready';
+        } else {
+            pill.style.background = 'rgba(245, 158, 11, 0.18)';
+            pill.style.color = '#fcd34d';
+            dot.style.background = '#f59e0b';
+            text.textContent = 'Offline • Local Mode';
+        }
+    }
+
+    updateNetworkStatusUI();
+    window.addEventListener('online', () => {
+        updateNetworkStatusUI();
+        if (window.mtronixOfflineQueue) {
+            window.mtronixOfflineQueue.syncQueue();
+        }
+    });
+    window.addEventListener('offline', updateNetworkStatusUI);
 });
+
+// ─── Offline POS Sale Queue ───────────────────────────────────
+window.mtronixOfflineQueue = (() => {
+    const STORAGE_KEY = 'mtronix_offline_sales_queue';
+
+    function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    function getQueue() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveQueue(queue) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+        window.dispatchEvent(new CustomEvent('mtronix:queue-updated', { detail: { count: queue.length } }));
+    }
+
+    function enqueueSale(payload) {
+        const queue = getQueue();
+        queue.push({
+            id: `OFFLINE-${Date.now()}`,
+            queued_at: new Date().toISOString(),
+            payload,
+        });
+        saveQueue(queue);
+        return queue.length;
+    }
+
+    async function syncQueue() {
+        const queue = getQueue();
+        if (!queue.length || !navigator.onLine) return { synced: 0, remaining: queue.length };
+
+        const remaining = [];
+        let synced = 0;
+
+        for (const entry of queue) {
+            try {
+                const resp = await fetch('/api/sales/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify(entry.payload),
+                });
+                if (resp.ok) {
+                    synced += 1;
+                } else {
+                    remaining.push(entry);
+                }
+            } catch (err) {
+                remaining.push(entry);
+            }
+        }
+
+        saveQueue(remaining);
+        if (synced > 0) {
+            showToast(`Synced ${synced} offline sale(s) to server.`, 'success');
+        }
+        return { synced, remaining: remaining.length };
+    }
+
+    return { getQueue, enqueueSale, syncQueue };
+})();

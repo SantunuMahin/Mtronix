@@ -6,11 +6,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice #SALE-{{ sale.pk|stringformat:"05d" }} - Mtronix</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&family=Dancing+Script:wght@700&display=swap"
-        rel="stylesheet">
     <style>
         * {
             box-sizing: border-box;
@@ -513,6 +508,12 @@
                 </div>
                 <div class="invoice-title-col">
                     <h2 class="invoice-main-title">SALES INVOICE</h2>
+                    {% if barcode_svg %}
+                    <div class="invoice-barcode" style="margin: 4px 0 6px auto; display: flex; flex-direction: column; align-items: flex-end;">
+                        {{ barcode_svg|safe }}
+                        <span style="font-size: 9.5px; font-family: 'JetBrains Mono', monospace; font-weight: 600; letter-spacing: 1.5px; color: #000; margin-top: 2px;">{{ barcode_code }}</span>
+                    </div>
+                    {% endif %}
                     <table class="meta-table">
                         <tr>
                             <td class="lbl">Invoice #</td>
@@ -613,24 +614,8 @@
                     <span class="sign-title">Customer's Signature</span>
                 </div>
                 <div class="sign-block">
-                    {% if authorized_by and authorized_by.is_authenticated %}
-                    <div
-                        style="min-height: 36px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px;">
-                        <span
-                            style="font-family: 'Dancing Script', cursive; font-size: 28px; font-weight: 700; color: #000000; line-height: 1; letter-spacing: 0.5px;">
-                            {{ authorized_by.get_full_name|default:authorized_by.username }}
-                        </span>
-                    </div>
-                    {% else %}
-                    <div style="min-height: 36px;"></div>
-                    {% endif %}
                     <div class="sign-line"></div>
                     <span class="sign-title">Authorized Signature</span>
-                    {% if authorized_by and authorized_by.is_authenticated %}
-                    <span style="display:block; font-size: 10px; color: #4b5563; margin-top: 2px;">
-                        {% if authorized_by.profile and authorized_by.profile.get_role_display %}{{ authorized_by.profile.get_role_display }} &bull; {% endif %}{{ sale.sold_at|date:"d M Y" }}
-                    </span>
-                    {% endif %}
                 </div>
             </div>
 
