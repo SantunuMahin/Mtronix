@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import importlib.util
 import os
 from pathlib import Path
 try:
@@ -164,11 +165,14 @@ LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'accounts:login'
 
 # Django REST Framework defaults (require authentication for all API ViewSets)
+_DRF_AUTH_CLASSES = [
+    'rest_framework.authentication.SessionAuthentication',
+]
+if importlib.util.find_spec('rest_framework_simplejwt') is not None:
+    _DRF_AUTH_CLASSES.append('rest_framework_simplejwt.authentication.JWTAuthentication')
+
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': _DRF_AUTH_CLASSES,
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
