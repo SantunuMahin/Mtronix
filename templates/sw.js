@@ -1,7 +1,7 @@
-const CACHE_NAME = 'mtronix-offline-v1';
+const CACHE_NAME = 'mtronix-offline-v3';
 const STATIC_ASSETS = [
-    '/static/css/app.css?v=2.7',
-    '/static/js/app.js?v=2.7',
+    '/static/css/app.css?v=3.1',
+    '/static/js/app.js?v=3.1',
     '/static/js/chart.umd.min.js?v=4.4.3',
     '/static/js/html5-qrcode.min.js?v=3.0.0',
     '/static/img/logo.png',

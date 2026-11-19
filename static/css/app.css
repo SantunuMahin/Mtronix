@@ -321,7 +321,7 @@ a { color: inherit; text-decoration: none; }
     border-color: var(--accent);
 }
 
-@media (min-width: 821px) {
+@media (min-width: 901px) {
     html.sidebar-icons .sidebar {
         width: 72px;
         padding: 18px 10px 14px;
@@ -360,13 +360,35 @@ a { color: inherit; text-decoration: none; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 18px;
-    padding: 20px 28px;
-    background: var(--panel);
+    gap: 16px;
+    padding: 16px 28px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--line);
     position: sticky;
     top: 0;
-    z-index: 50;
+    z-index: 60;
+}
+
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 90;
+}
+
+.users-admin-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 360px) 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.mobile-bottom-nav {
+    display: none;
 }
 
 .topbar h1 {
@@ -924,13 +946,17 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 900px) {
     .sidebar {
         transform: translateX(-100%);
-        transition: transform 180ms ease;
+        transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
     }
+    .sidebar-collapse-btn { display: none; }
+    body.menu-open { overflow: hidden; }
     body.menu-open .sidebar { transform: translateX(0); }
+    body.menu-open .sidebar-backdrop { display: block; }
     .shell { margin-left: 0; }
     .mobile-menu, .icon-button { display: inline-flex; }
-    .metrics, .two-column, .three-column { grid-template-columns: 1fr; }
-    .topbar { align-items: flex-start; }
+    .metrics, .two-column, .three-column, .users-admin-grid { grid-template-columns: 1fr; }
+    .topbar { align-items: center; flex-wrap: wrap; padding: 14px 18px; }
     .sale-layout { grid-template-columns: 1fr; }
     .sale-summary-panel {
         position: static;
@@ -946,12 +972,72 @@ tbody tr:last-child td { border-bottom: none; }
     }
 }
 
+@media (max-width: 768px) {
+    main { padding: 16px 14px 86px; }
+    .table-wrap { -webkit-overflow-scrolling: touch; }
+    input[type="text"],
+    input[type="search"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    select,
+    textarea {
+        font-size: 16px;
+    }
+    .filter-bar { padding: 12px; gap: 8px; }
+    .filter-bar input,
+    .filter-bar select { min-width: 0 !important; max-width: 100% !important; flex: 1 1 180px; width: 100%; }
+    .mobile-bottom-nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 80;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        background: rgba(12, 22, 32, 0.96);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+        box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+    }
+    .mobile-bottom-nav a,
+    .mobile-bottom-nav button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        min-height: 46px;
+        color: #94a3b8;
+        font-size: 10.5px;
+        font-weight: 600;
+        text-decoration: none;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        padding: 4px 2px;
+        border-radius: 8px;
+        transition: color 0.15s, background 0.15s;
+    }
+    .mobile-bottom-nav a.active {
+        color: var(--accent-light);
+        background: rgba(20, 184, 166, 0.12);
+    }
+}
+
 @media (max-width: 620px) {
-    main { padding: 16px; }
-    .topbar { padding: 14px 16px; flex-wrap: wrap; }
-    .topbar h1 { font-size: 20px; }
+    .topbar { padding: 12px 14px; gap: 10px; }
+    .topbar h1 { font-size: 19px; }
+    .topbar p { font-size: 12.5px; }
     .panel { padding: 14px; }
-    .messages-container { padding: 12px 16px 0; }
+    .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; }
+    .kpi-card { padding: 14px; }
+    .kpi-value { font-size: 18px; }
+    .messages-container { padding: 12px 14px 0; }
     .sale-items-panel { padding: 0; }
     .sale-items-head,
     .sale-item-row { padding: 14px; }

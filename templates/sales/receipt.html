@@ -493,8 +493,7 @@
                     <div class="customer-name">
                         <span>{{ sale.customer_name|default:"Walk-in Customer" }}</span>
                         {% if prev_history and prev_history.has_previous_orders %}
-                        <span class="cust-tag">Returning Customer (Order #{{ prev_history.previous_orders_count|add:1
-                            }})</span>
+                        <span class="cust-tag">Returning Customer (Order #{{ prev_history.previous_orders_count|add:1 }})</span>
                         {% endif %}
                     </div>
                     <div class="customer-details">

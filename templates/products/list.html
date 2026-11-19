@@ -135,7 +135,7 @@
     <!-- Search & Filter Controls -->
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
         <!-- Search Form -->
-        <form method="get" action="{% url 'products:list' %}" style="display: flex; gap: 8px; flex: 1; min-width: 280px;">
+        <form method="get" action="{% url 'products:list' %}" style="display: flex; gap: 8px; flex: 1 1 220px; min-width: 0; flex-wrap: wrap;">
             {% if selected_group %}
             <input type="hidden" name="group" value="{{ selected_group }}">
             {% endif %}

@@ -47,8 +47,9 @@ function fallbackCopy(text, label) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Sidebar toggle (desktop: hide/show + icon-only collapse; mobile: drawer)
-    const menuToggle = document.querySelector('[data-menu-toggle]');
+    // Sidebar toggle (desktop: hide/show + icon-only collapse; mobile <= 900px: drawer)
+    const menuToggles = document.querySelectorAll('[data-menu-toggle]');
+    const menuClosers = document.querySelectorAll('[data-menu-close]');
     const collapseBtn = document.getElementById('btn-sidebar-collapse');
     const rootEl = document.documentElement;
 
@@ -69,9 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (menuToggle) {
-        menuToggle.addEventListener('click', () => {
-            if (window.innerWidth <= 820) {
+    menuToggles.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            if (window.innerWidth <= 900) {
                 document.body.classList.toggle('menu-open');
                 return;
             }
@@ -83,7 +84,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('mtronix_sidebar_mode', isIcons ? 'icons' : 'expanded');
             }
         });
-    }
+    });
+
+    menuClosers.forEach((el) => {
+        el.addEventListener('click', () => {
+            document.body.classList.remove('menu-open');
+        });
+    });
+
+    // Close mobile sidebar on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.body.classList.contains('menu-open')) {
+            document.body.classList.remove('menu-open');
+        }
+    });
 
     // Close sidebar when clicking outside on mobile
     document.addEventListener('click', (e) => {
@@ -213,15 +227,203 @@ window.mtronixOfflineQueue = (() => {
         window.dispatchEvent(new CustomEvent('mtronix:queue-updated', { detail: { count: queue.length } }));
     }
 
-    function enqueueSale(payload) {
+    function escapeHtml(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function enqueueSale(payload, receiptMeta = null) {
         const queue = getQueue();
-        queue.push({
-            id: `OFFLINE-${Date.now()}`,
+        const shortCode = String(Date.now()).slice(-5);
+        const entry = {
+            id: `OFFLINE-${shortCode}`,
             queued_at: new Date().toISOString(),
             payload,
-        });
+            receipt: receiptMeta,
+        };
+        queue.push(entry);
         saveQueue(queue);
-        return queue.length;
+        return entry;
+    }
+
+    function buildOfflineInvoiceHtml(entry) {
+        const p = entry.payload || {};
+        const r = entry.receipt || {};
+        const items = r.items || p.items || [];
+        const dt = new Date(entry.queued_at || Date.now());
+        const dateStr = dt.toLocaleString('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: true,
+        });
+
+        let subtotal = 0;
+        const rowsHtml = items.map((item, idx) => {
+            const qty = parseInt(item.quantity, 10) || 0;
+            const unitPrice = parseFloat(item.unit_price) || 0;
+            const lineTotal = qty * unitPrice;
+            subtotal += lineTotal;
+            const name = escapeHtml(item.display_name || item.custom_name || `Product #${item.product || ''}`);
+            const sku = item.sku ? `<div style="font-size:11px;color:#4b5563;">SKU: ${escapeHtml(item.sku)}</div>` : '';
+            return `
+                <tr>
+                    <td style="text-align:center;font-weight:600;">${idx + 1}</td>
+                    <td><div style="font-weight:700;">${name}</div>${sku}</td>
+                    <td style="text-align:right;font-weight:600;">${qty}</td>
+                    <td style="text-align:right;">${unitPrice.toFixed(2)}</td>
+                    <td style="text-align:right;font-weight:700;">${lineTotal.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const status = (p.payment_status || 'PAID').toUpperCase();
+        let paidAmt = parseFloat(p.paid_amount) || 0;
+        if (status === 'PAID') paidAmt = subtotal;
+        else if (status === 'UNPAID') paidAmt = 0;
+        else paidAmt = Math.min(subtotal, Math.max(0, paidAmt));
+        const dueAmt = Math.max(0, subtotal - paidAmt);
+
+        const custName = escapeHtml((p.customer_name || '').trim() || 'Walk-in Customer');
+        const custPhone = p.customer_phone ? `<div>Phone: ${escapeHtml(p.customer_phone)}</div>` : '';
+        const custAddr = p.customer_address ? `<div>Address: ${escapeHtml(p.customer_address)}</div>` : '';
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Invoice #${escapeHtml(entry.id)} - Mtronix</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #000; background: #fff; padding: 28px 34px; }
+    .sheet { max-width: 780px; margin: 0 auto; min-height: 980px; display: flex; flex-direction: column; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding-bottom: 16px; border-bottom: 2px solid #000; margin-bottom: 18px; }
+    .brand h1 { font-size: 22px; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; }
+    .brand p { font-size: 11.5px; color: #333; line-height: 1.45; }
+    .logo { max-height: 54px; width: auto; object-fit: contain; }
+    .meta { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 18px; font-size: 12.5px; }
+    .meta-box h3 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: #555; margin-bottom: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border: 1.5px solid #000; font-size: 10.5px; font-weight: 800; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12.5px; }
+    th { text-align: left; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 8px 6px; font-size: 11px; text-transform: uppercase; }
+    td { padding: 8px 6px; border-bottom: 1px solid #d1d5db; vertical-align: top; }
+    .totals { margin-left: auto; width: 270px; font-size: 13px; }
+    .tot-row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .tot-row.grand { border-top: 2px solid #000; margin-top: 6px; padding-top: 8px; font-size: 15px; font-weight: 900; }
+    .bottom { margin-top: auto; padding-top: 48px; }
+    .signs { display: flex; justify-content: space-between; gap: 40px; margin-bottom: 22px; }
+    .sign-block { width: 210px; text-align: center; }
+    .sign-line { border-top: 1.2px solid #000; margin-bottom: 6px; }
+    .sign-title { font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .footer { border-top: 1px solid #d1d5db; padding-top: 10px; font-size: 10.5px; color: #4b5563; display: flex; justify-content: space-between; }
+    @media print { body { padding: 0; } .sheet { min-height: 275mm; } }
+</style>
+</head>
+<body>
+<div class="sheet">
+    <div>
+        <div class="top">
+            <div class="brand">
+                <h1>MTRONIX</h1>
+                <p>44/45, Madina Electric &amp; Electronics, (2nd floor), shop no. 3, 4. Kaptan Bazar, Dhaka.<br>
+                Phone: 01744676770 &bull; Email: mtronix1203@gmail.com</p>
+            </div>
+            <img class="logo" src="/static/img/logo.png" alt="Mtronix" onerror="this.style.display='none'">
+        </div>
+        <div class="meta">
+            <div class="meta-box">
+                <h3>Bill To</h3>
+                <div style="font-size:14px;font-weight:800;">${custName}</div>
+                ${custPhone}
+                ${custAddr}
+            </div>
+            <div class="meta-box" style="text-align:right;">
+                <h3>Offline Invoice</h3>
+                <div style="font-size:14px;font-weight:800;">#${escapeHtml(entry.id)}</div>
+                <div>Date: ${escapeHtml(dateStr)}</div>
+                <div style="margin-top:4px;"><span class="badge">${escapeHtml(status)}</span></div>
+            </div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:42px;text-align:center;">SL</th>
+                    <th>Description</th>
+                    <th style="width:65px;text-align:right;">QTY</th>
+                    <th style="width:105px;text-align:right;">Unit Price</th>
+                    <th style="width:115px;text-align:right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+        </table>
+        <div class="totals">
+            <div class="tot-row"><span>Subtotal</span><span>BDT ${subtotal.toFixed(2)}</span></div>
+            <div class="tot-row"><span>Paid Amount</span><span>BDT ${paidAmt.toFixed(2)}</span></div>
+            ${dueAmt > 0 ? `<div class="tot-row"><span>Due Amount</span><span><strong>BDT ${dueAmt.toFixed(2)}</strong></span></div>` : ''}
+            <div class="tot-row grand"><span>Total (BDT)</span><span>BDT ${subtotal.toFixed(2)}</span></div>
+        </div>
+    </div>
+    <div class="bottom">
+        <div class="signs">
+            <div class="sign-block">
+                <div class="sign-line"></div>
+                <div class="sign-title">Customer's Signature</div>
+            </div>
+            <div class="sign-block">
+                <div class="sign-line"></div>
+                <div class="sign-title">Authorized Signature</div>
+            </div>
+        </div>
+        <div class="footer">
+            <span><strong>Thank you for doing business with Mtronix!</strong></span>
+            <span>Offline Invoice &bull; Pending Server Sync</span>
+        </div>
+    </div>
+</div>
+</body>
+</html>`;
+    }
+
+    function printOfflineInvoice(entry) {
+        if (!entry) return;
+        const html = buildOfflineInvoiceHtml(entry);
+        let iframe = document.getElementById('offline-invoice-print-frame');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'offline-invoice-print-frame';
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+        }
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        setTimeout(() => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                const win = window.open('', '_blank');
+                if (win) {
+                    win.document.write(html);
+                    win.document.close();
+                    win.print();
+                }
+            }
+        }, 200);
+    }
+
+    function printLastInvoice() {
+        const queue = getQueue();
+        if (!queue.length) return;
+        printOfflineInvoice(queue[queue.length - 1]);
     }
 
     async function syncQueue() {
@@ -258,5 +460,5 @@ window.mtronixOfflineQueue = (() => {
         return { synced, remaining: remaining.length };
     }
 
-    return { getQueue, enqueueSale, syncQueue };
+    return { getQueue, enqueueSale, syncQueue, printOfflineInvoice, printLastInvoice };
 })();

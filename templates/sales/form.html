@@ -15,8 +15,9 @@
     align-items: start;
 }
 @media (max-width: 860px) {
-    .se-layout { grid-template-columns: 1fr; }
-    .se-sidebar { order: -1; }
+    .se-layout { grid-template-columns: 1fr; gap: 16px; }
+    .se-sidebar { position: static !important; order: 2; }
+    .se-quickbar { flex-wrap: wrap; }
 }
 
 /* ── Quick search bar ─────────────────────────────────────────────── */
@@ -190,7 +191,20 @@
     align-items: end;
 }
 @media (max-width: 700px) {
-    .se-fields { grid-template-columns: 1fr 1fr; }
+    .se-fields { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .se-line-total {
+        grid-column: 1 / -1;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        background: #ffffff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+    }
+    .se-line-total label { margin-bottom: 0; font-size: 12px; }
+    .se-line-total strong { font-size: 17px; color: var(--accent); }
+    .se-items-head { flex-wrap: wrap; gap: 10px; }
 }
 
 .se-field label {
@@ -283,7 +297,8 @@
 /* ── Sidebar ──────────────────────────────────────────────────────── */
 .se-sidebar {
     position: sticky;
-    top: 16px;
+    top: 88px;
+    z-index: 10;
 }
 .se-summary { padding: 20px; }
 .se-summary-title {
@@ -873,7 +888,10 @@
 <section class="sale-entry" style="max-width: 1100px; margin: 0 auto;">
     <div id="offline-queue-banner" style="display: none; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 12px 16px; border-radius: 10px; margin-bottom: 14px; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
         <span id="offline-queue-text" style="font-size: 13px; font-weight: 600;"></span>
-        <button type="button" id="btn-sync-offline-sales" class="button primary" style="min-height: 32px; padding: 4px 12px; font-size: 12px;">Sync Now</button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="btn-print-last-offline" class="button" style="min-height: 32px; padding: 4px 12px; font-size: 12px; background: #ffffff;">🖨️ Print Last Offline Invoice</button>
+            <button type="button" id="btn-sync-offline-sales" class="button primary" style="min-height: 32px; padding: 4px 12px; font-size: 12px;">Sync Now</button>
+        </div>
     </div>
     <form method="post" novalidate id="sale-form">
         {% csrf_token %}
@@ -1275,6 +1293,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const offlineBanner = document.getElementById('offline-queue-banner');
     const offlineBannerText = document.getElementById('offline-queue-text');
     const offlineSyncBtn = document.getElementById('btn-sync-offline-sales');
+    const offlinePrintLastBtn = document.getElementById('btn-print-last-offline');
+    const offlineCatalogMap = new Map(
+        JSON.parse(document.getElementById('products-catalog-data')?.textContent || '[]').map(p => [String(p.id), p])
+    );
+
+    if (offlinePrintLastBtn && window.mtronixOfflineQueue) {
+        offlinePrintLastBtn.addEventListener('click', () => {
+            window.mtronixOfflineQueue.printLastInvoice();
+        });
+    }
 
     function refreshOfflineBanner() {
         if (!offlineBanner || !offlineBannerText || !window.mtronixOfflineQueue) return;
@@ -1307,6 +1335,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
 
             const items = [];
+            const receiptItems = [];
             offlineSaleForm.querySelectorAll('input[name$="-quantity"]').forEach((qty) => {
                 const row = qty.closest('tr, .sale-item-row, .se-item-row, .item-row, div[data-formset-row]') || qty.parentElement?.parentElement;
                 if (!row) return;
@@ -1320,9 +1349,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const qtyVal = parseInt(qty.value, 10) || 0;
                 const priceVal = price ? price.value : '0.00';
                 if ((prodVal || customVal) && qtyVal > 0) {
+                    const prodObj = prodVal ? offlineCatalogMap.get(String(prodVal)) : null;
                     items.push({
                         product: prodVal,
                         custom_name: customVal,
+                        quantity: qtyVal,
+                        unit_price: priceVal,
+                    });
+                    receiptItems.push({
+                        product: prodVal,
+                        display_name: prodObj ? prodObj.name : (customVal || 'Custom Item'),
+                        sku: prodObj ? (prodObj.sku || '') : '',
                         quantity: qtyVal,
                         unit_price: priceVal,
                     });
@@ -1343,10 +1380,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 items,
             };
 
-            const count = window.mtronixOfflineQueue.enqueueSale(payload);
+            const entry = window.mtronixOfflineQueue.enqueueSale(payload, { items: receiptItems });
             refreshOfflineBanner();
+            window.mtronixOfflineQueue.printOfflineInvoice(entry);
             if (typeof showToast === 'function') {
-                showToast(`Offline mode: Sale saved locally (#${count} in queue).`, 'success');
+                showToast(`Offline mode: Sale ${entry.id} saved & printing invoice...`, 'success');
             }
         });
     }

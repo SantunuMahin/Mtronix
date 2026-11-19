@@ -36,6 +36,9 @@
     border-radius: 10px;
     border: 1px solid #e2e8f0;
     gap: 4px;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 .sales-pill {
     padding: 6px 16px;
@@ -122,7 +125,8 @@
     display: flex;
     gap: 8px;
     flex: 1;
-    min-width: 280px;
+    min-width: 0;
+    flex: 1 1 220px;
 }
 .sales-search-input {
     flex: 1;
